@@ -19,6 +19,11 @@ public class Company {
     private String email;
     @Column(unique = true)
     private String slug;
+    private String phone;
+    private String address;
+    private String description;
+    private String primaryColor;
+    private String logoUrl;
 
     public Long getId() {
         return id;
