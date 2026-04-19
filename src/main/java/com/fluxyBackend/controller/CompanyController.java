@@ -1,7 +1,6 @@
 package com.fluxyBackend.controller;
 
 import com.fluxyBackend.entity.Company;
-import com.fluxyBackend.repository.CompanyRepository;
 import com.fluxyBackend.service.CompanyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
