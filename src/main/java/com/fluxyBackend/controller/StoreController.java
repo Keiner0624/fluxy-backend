@@ -37,4 +37,9 @@ public class StoreController {
                 .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
         return orderService.createOrderAsClient(request, company);
     }
+    @GetMapping("/{companyId}/info")
+    public Company getCompanyInfo(@PathVariable Long companyId) {
+        return companyRepository.findById(companyId)
+                .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+    }
 }
