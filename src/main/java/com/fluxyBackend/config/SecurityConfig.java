@@ -39,10 +39,14 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**", "/companies/**", "/store/**", "/store/slug/**").permitAll()
+                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/companies/**").permitAll()
+                        .requestMatchers("/store/**").permitAll()
+                        .requestMatchers("/me/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .formLogin(form -> form.disable())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
