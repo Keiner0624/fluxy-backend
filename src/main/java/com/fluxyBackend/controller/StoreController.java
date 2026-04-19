@@ -42,4 +42,24 @@ public class StoreController {
         return companyRepository.findById(companyId)
                 .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
     }
+
+    @GetMapping("/slug/{slug}/info")
+    public Company getBySlug(@PathVariable String slug) {
+        return companyRepository.findBySlug(slug)
+                .orElseThrow(() -> new RuntimeException("Tienda no encontrada"));
+    }
+
+    @GetMapping("/slug{slug}/products")
+    public List<Prodcut> getProductsBySlug(@PathVariable String slug) {
+        Company company = companyRepository.findBySlug(slug)
+                .orElseThrow(() -> new RuntimeException("Tienda no encontrada"));
+        return productRepository.findByCompany(company);
+    }
+
+    @GetMapping("/slug{slug}/order")
+    public Order createOrderBySlug(@PathVariable String slug, @RequestBody CreateOrderRequest request) {
+        Company company = companyRepository.findBySlug(slug)
+                .orElseThrow(() -> new RuntimeException("Tienda no encontrada"));
+        return orderService.createOrderAsClient(request, company);
+    }
 }
