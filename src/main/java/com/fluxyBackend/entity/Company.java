@@ -1,9 +1,6 @@
 package com.fluxyBackend.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,6 +17,8 @@ public class Company {
     private Long id;
     private String name;
     private String email;
+    @Column(unique = true)
+    private String slug;
 
     public Long getId() {
         return id;
@@ -43,5 +42,12 @@ public class Company {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getSlug() {
+        return slug;
+    }
+    public void setSlug(String slug) {
+        this.slug = slug;
     }
 }
