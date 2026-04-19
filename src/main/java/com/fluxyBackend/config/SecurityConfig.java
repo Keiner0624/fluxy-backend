@@ -32,6 +32,7 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
+    // Multi-tenant store fix - v2
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
