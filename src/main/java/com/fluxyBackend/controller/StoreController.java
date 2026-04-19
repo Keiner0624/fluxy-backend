@@ -49,7 +49,7 @@ public class StoreController {
                 .orElseThrow(() -> new RuntimeException("Tienda no encontrada"));
     }
 
-    @GetMapping("/slug{slug}/products")
+    @GetMapping("/slug/{slug}/products")
     public List<Prodcut> getProductsBySlug(@PathVariable String slug) {
         Company company = companyRepository.findBySlug(slug)
                 .orElseThrow(() -> new RuntimeException("Tienda no encontrada"));
