@@ -29,4 +29,7 @@ public class Prodcut {
     @ManyToOne
     @JoinColumn(name = "company_id")
     private Company company;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
 }
