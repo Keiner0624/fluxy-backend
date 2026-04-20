@@ -29,7 +29,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
-        return path.startsWith("/auth/") || path.startsWith("/companies") || path.startsWith("/store/") || path.startsWith("/store/slug/");
+        String method = request.getMethod();
+
+        // Solo saltamos el filtro para rutas verdaderamente públicas
+        if (path.startsWith("/auth/")) return true;
+        if (path.startsWith("/store/")) return true;
+        if (path.startsWith("/me/")) return true;
+
+        // /companies solo es público para GET (listar) y POST (crear empresa)
+        if (path.equals("/companies") || path.equals("/companies/")) return true;
+
+        return false;
     }
 
     @Override
