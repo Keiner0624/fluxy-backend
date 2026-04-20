@@ -40,9 +40,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/companies/").permitAll()
-                        .requestMatchers("/companies/my-company").authenticated()
-                        .requestMatchers("/companies/config").authenticated()
+                        .requestMatchers("/companies", "/companies/").permitAll()
                         .requestMatchers("/store/**").permitAll()
                         .requestMatchers("/me/**").permitAll()
                         .anyRequest().authenticated()
