@@ -20,6 +20,7 @@ public class Prodcut {
     private String name;
     private double price;
     private int stock;
+    private String imageUrl;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false)
