@@ -120,24 +120,27 @@ public class OrderService {
         Order savedOrder = orderRepository.save(order);
 
         // Notificar al vendedor por email
-        try {
-            userRepository.findAll()
-                    .stream()
-                    .filter(u -> u.getCompany() != null &&
-                            u.getCompany().getId().equals(company.getId()))
-                    .findFirst()
-                    .ifPresent(owner -> emailService.sendOrderNotification(
-                            owner.getEmail(),
-                            owner.getFullName(),
-                            request.customerName,
-                            savedOrder.getTotal(),
-                            savedOrder.getId()
-                    ));
-        } catch (Exception e) {
-            System.out.println("Error enviando email: " + e.getMessage());
-        }
+        // Notificar al vendedor por email en hilo separado
+        new Thread(() -> {
+            try {
+                userRepository.findAll()
+                        .stream()
+                        .filter(u -> u.getCompany() != null &&
+                                u.getCompany().getId().equals(company.getId()))
+                        .findFirst()
+                        .ifPresent(owner -> emailService.sendOrderNotification(
+                                owner.getEmail(),
+                                owner.getFullName(),
+                                request.customerName,
+                                savedOrder.getTotal(),
+                                savedOrder.getId()
+                        ));
+            } catch (Exception e) {
+                System.out.println("Error enviando email: " + e.getMessage());
+            }
+        }).start();
 
-        return savedOrder;
+        return savedOrder; // ← retorna inmediatamente sin esperar el email
     }
 
     public List<Order> getOrder(String email) {
@@ -266,5 +269,6 @@ public class OrderService {
             return response;
         }).toList();
     }
+
 }
 
