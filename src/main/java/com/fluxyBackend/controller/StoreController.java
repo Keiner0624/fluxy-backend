@@ -56,7 +56,7 @@ public class StoreController {
         return productRepository.findByCompany(company);
     }
 
-    @GetMapping("/slug{slug}/order")
+    @PostMapping("/slug{slug}/order")
     public Order createOrderBySlug(@PathVariable String slug, @RequestBody CreateOrderRequest request) {
         Company company = companyRepository.findBySlug(slug)
                 .orElseThrow(() -> new RuntimeException("Tienda no encontrada"));
