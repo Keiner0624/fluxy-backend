@@ -3,6 +3,7 @@ package com.fluxyBackend.controller;
 import com.fluxyBackend.DTOs.CreateOrderRequest;
 import com.fluxyBackend.DTOs.DashborardResponse;
 import com.fluxyBackend.DTOs.SalesPerDayResponse;
+import com.fluxyBackend.DTOs.TopProductResponse;
 import com.fluxyBackend.entity.Company;
 import com.fluxyBackend.entity.Order;
 import com.fluxyBackend.repository.OrderRepository;
@@ -68,5 +69,9 @@ public class OrderController {
     public List<SalesPerDayResponse> salesDay(Authentication authentication){
         return orderService.getSalesPerDay(authentication.getName());
     }
-
+    @GetMapping("/dashboard/top-products")
+    public List<TopProductResponse> getTopProducts(@RequestParam(defaultValue = "month") String period,
+                                                   Authentication authentication) {
+        return orderService.getTopProducts(authentication.getName(), period);
+    }
 }

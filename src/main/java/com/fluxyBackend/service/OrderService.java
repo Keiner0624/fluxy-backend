@@ -1,9 +1,6 @@
 package com.fluxyBackend.service;
 
-import com.fluxyBackend.DTOs.CreateOrderRequest;
-import com.fluxyBackend.DTOs.DashborardResponse;
-import com.fluxyBackend.DTOs.OrderItemsRequest;
-import com.fluxyBackend.DTOs.SalesPerDayResponse;
+import com.fluxyBackend.DTOs.*;
 import com.fluxyBackend.entity.*;
 import com.fluxyBackend.repository.OrderRepository;
 import com.fluxyBackend.repository.ProductRepository;
@@ -268,6 +265,43 @@ public class OrderService {
             response.total = entry.getValue();
             return response;
         }).toList();
+    }
+
+    public List<TopProductResponse> getTopProducts(String email, String period) {
+        User user = getUserByEmail(email);
+        LocalDateTime startDate;
+
+        if ("today".equals(period)) {
+            startDate = LocalDateTime.now().toLocalDate().atStartOfDay();
+        } else {
+            startDate = LocalDateTime.now().minusMonths(1);
+        }
+
+        Map<String, int[]> counter = new HashMap<>(); // [quantity, revenue*100]
+
+        for (Order order : orderRepository.findByCompany(user.getCompany())) {
+            if (order.getStatus() != OrderStatus.COMPLETED) continue;
+            if (order.getCreatedAt().isBefore(startDate)) continue;
+
+            for (OrderItem item : order.getItems()) {
+                String name = item.getProdcut().getName();
+                counter.computeIfAbsent(name, k -> new int[]{0, 0});
+                counter.get(name)[0] += item.getQuantity();
+                counter.get(name)[1] += (int)(item.getSubTotal() * 100);
+            }
+        }
+
+        return counter.entrySet().stream()
+                .sorted((a, b) -> Integer.compare(b.getValue()[0], a.getValue()[0]))
+                .limit(5)
+                .map(entry -> {
+                    TopProductResponse r = new TopProductResponse();
+                    r.productName = entry.getKey();
+                    r.quantitySold = entry.getValue()[0];
+                    r.totalRevenue = entry.getValue()[1] / 100.0;
+                    return r;
+                })
+                .toList();
     }
 
 }
