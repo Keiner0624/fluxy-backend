@@ -116,8 +116,6 @@ public class OrderService {
         order.setTotal(total);
         Order savedOrder = orderRepository.save(order);
 
-        // Notificar al vendedor por email
-        // Notificar al vendedor por email en hilo separado
         new Thread(() -> {
             try {
                 userRepository.findAll()
@@ -128,9 +126,7 @@ public class OrderService {
                         .ifPresent(owner -> emailService.sendOrderNotification(
                                 owner.getEmail(),
                                 owner.getFullName(),
-                                request.customerName,
-                                savedOrder.getTotal(),
-                                savedOrder.getId()
+                                savedOrder  // ← pasa el objeto Order completo
                         ));
             } catch (Exception e) {
                 System.out.println("Error enviando email: " + e.getMessage());
