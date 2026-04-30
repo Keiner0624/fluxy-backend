@@ -35,7 +35,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (path.startsWith("/auth/")) return true;
         if (path.startsWith("/store/")) return true;
         if (path.startsWith("/me/")) return true;
-
         // /companies solo es público para GET (listar) y POST (crear empresa)
         if (path.equals("/companies") || path.equals("/companies/")) return true;
 
