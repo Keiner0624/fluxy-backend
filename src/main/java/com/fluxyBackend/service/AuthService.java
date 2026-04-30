@@ -55,15 +55,37 @@ public class AuthService {
     @Transactional
     public RegisterBussinesResponse registerBusiness(RegisterBussinesRequest request) {
         String normalizedEmail = normalizeEmail(request.email);
-        if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "El email ya existe");
+        String businessName = normalizeText(request.businesName);
+        String whatsapp = normalizeText(request.whatssapp);
+
+        User existingUser = userRepository.findByEmailIgnoreCase(normalizedEmail).orElse(null);
+        if (existingUser != null) {
+            if (!passwordEncoder.matches(request.password, existingUser.getPassword())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "El email ya existe. Inicia sesion con esa cuenta");
+            }
+
+            Company existingCompany = existingUser.getCompany();
+            if (existingCompany == null) {
+                Company company = Company.builder()
+                        .name(businessName)
+                        .email(normalizedEmail)
+                        .phone(whatsapp)
+                        .build();
+                existingCompany = companyService.createCompany(company);
+                existingUser.setCompany(existingCompany);
+                existingUser.setRole(Role.BUSINESS_OWNER);
+                existingUser = userRepository.save(existingUser);
+            }
+
+            String token = jwtService.generateToken(existingUser.getEmail());
+            return buildRegisterBusinessResponse(existingCompany, existingUser, token);
         }
 
-        String businessName = request.businesName == null ? null : request.businesName.trim();
         Company company = Company.builder()
                 .name(businessName)
                 .email(normalizedEmail)
-                .phone(request.whatssapp == null ? null : request.whatssapp.trim())
+                .phone(whatsapp)
                 .build();
         Company savedCompany = companyService.createCompany(company);
 
@@ -103,5 +125,13 @@ public class AuthService {
 
     private String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase();
+    }
+
+    private String normalizeText(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }
