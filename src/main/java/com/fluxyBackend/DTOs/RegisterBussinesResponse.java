@@ -10,6 +10,8 @@ public class RegisterBussinesResponse {
         public String name;
         public String slug;
         public String storeUrl;
+        public String phone;
+        public String whatssapp;
     }
 
     public static class UserInfo {
