@@ -13,9 +13,11 @@ public class CompanyService {
     private final CompanyRepository companyRespository;
 
     public Company createCompany(Company company) {
-        if (company.getSlug() == null || company.getSlug().isEmpty()) {
-            company.setSlug(generateSlug(company.getName()));
-        }
+        String requestedSlug = company.getSlug();
+        String baseSlug = (requestedSlug == null || requestedSlug.isBlank())
+                ? generateSlug(company.getName())
+                : generateSlug(requestedSlug);
+        company.setSlug(generateUniqueSlug(baseSlug));
         return companyRespository.save(company);
     }
 
@@ -26,6 +28,16 @@ public class CompanyService {
     public Company getById(Long id) {
         return companyRespository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+    }
+
+    private String generateUniqueSlug(String baseSlug) {
+        String candidate = baseSlug;
+        int suffix = 2;
+        while (companyRespository.findBySlug(candidate).isPresent()) {
+            candidate = baseSlug + "-" + suffix;
+            suffix++;
+        }
+        return candidate;
     }
 
     private String generateSlug(String name) {

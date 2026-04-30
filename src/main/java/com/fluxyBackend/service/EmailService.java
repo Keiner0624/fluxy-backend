@@ -6,13 +6,17 @@ import com.sendgrid.*;
 import com.sendgrid.helpers.mail.*;
 import com.sendgrid.helpers.mail.objects.Content;
 import com.sendgrid.helpers.mail.objects.Email;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class EmailService {
 
-    @Value("${sendgrid.api.key}")
+    private static final Logger log = LoggerFactory.getLogger(EmailService.class);
+
+    @Value("${sendgrid.api.key:}")
     private String apiKey;
 
     @Value("${mail.from}")
@@ -20,6 +24,11 @@ public class EmailService {
 
     public void sendOrderNotification(String toEmail, String vendorName, Order order) {
         try {
+            if (apiKey == null || apiKey.isBlank()) {
+                log.warn("SENDGRID_API_KEY no configurada. Se omite el envio de email a {}", toEmail);
+                return;
+            }
+
             Email from = new Email(fromEmail, "Fluxy");
             Email to = new Email(toEmail);
             String subject = "🛒 Nuevo pedido de " + order.getCustomerName() + " — Fluxy";
@@ -146,9 +155,9 @@ public class EmailService {
             request.setBody(mail.build());
             sg.api(request);
 
-            System.out.println("Email enviado a: " + toEmail);
+            log.info("Email enviado a: {}", toEmail);
         } catch (Exception e) {
-            System.out.println("Error enviando email: " + e.getMessage());
+            log.error("Error enviando email a {}: {}", toEmail, e.getMessage());
         }
     }
 }
