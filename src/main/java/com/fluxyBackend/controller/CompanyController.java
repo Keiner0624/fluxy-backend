@@ -43,10 +43,23 @@ public class CompanyController {
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         Company company = user.getCompany();
 
-        if (config.getPhone() != null) company.setPhone(config.getPhone());
-        if (config.getAddress() != null) company.setAddress(config.getAddress());
-        if (config.getDescription() != null) company.setDescription(config.getDescription());
-        if (config.getPrimaryColor() != null) company.setPrimaryColor(config.getPrimaryColor());
+        if (config.getName() != null && !config.getName().isBlank())
+            company.setName(config.getName());
+        if (config.getDescription() != null)
+            company.setDescription(config.getDescription());
+        if (config.getPhone() != null)
+            company.setPhone(config.getPhone());
+        if (config.getAddress() != null)
+            company.setAddress(config.getAddress());
+        if (config.getEmail() != null)
+            company.setEmail(config.getEmail());
+        if (config.getLogoUrl() != null)
+            company.setLogoUrl(config.getLogoUrl());
+        if (config.getStoreStyle() != null)
+            company.setStoreStyle(config.getStoreStyle());
+        if (config.getPrimaryColor() != null)
+            company.setPrimaryColor(config.getPrimaryColor());
+
         return companyRepository.save(company);
     }
 
