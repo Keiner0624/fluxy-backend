@@ -112,7 +112,7 @@ public class AuthService {
         response.company.name = company.getName();
         response.company.slug = company.getSlug();
         response.company.storeUrl =
-                "https://fluxy-frontend-react-xtsb.vercel.app/store/" + company.getSlug();
+                "https://fluxy-frontend-react-xtsb.vercel.app/?store=" + company.getSlug();
         response.company.phone = company.getPhone();
         response.company.whatssapp = company.getPhone();
 
