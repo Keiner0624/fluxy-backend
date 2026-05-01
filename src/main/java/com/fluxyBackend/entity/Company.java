@@ -24,6 +24,8 @@ public class Company {
     private String description;
     private String primaryColor;
     private String logoUrl;
+    @Column(columnDefinition = "TEXT")
+    private String storeStyle;
 
     public Long getId() {
         return id;
@@ -54,5 +56,13 @@ public class Company {
     }
     public void setSlug(String slug) {
         this.slug = slug;
+    }
+
+    public String getStoreStyle() {
+        return storeStyle;
+    }
+
+    public void setStoreStyle(String storeStyle) {
+        this.storeStyle = storeStyle;
     }
 }

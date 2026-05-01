@@ -51,4 +51,33 @@ public class CompanyService {
                 .replaceAll("\\s+", "-")
                 .trim();
     }
+    public Company updateConfig(Long companyId, Company updates) {
+        Company company = companyRespository.findById(companyId)
+                .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+
+        if (updates.getName() != null && !updates.getName().isBlank()) {
+            company.setName(updates.getName());
+        }
+        if (updates.getDescription() != null) {
+            company.setDescription(updates.getDescription());
+        }
+        if (updates.getPhone() != null) {
+            company.setPhone(updates.getPhone());
+        }
+        if (updates.getAddress() != null) {
+            company.setAddress(updates.getAddress());
+        }
+        if (updates.getEmail() != null) {
+            company.setEmail(updates.getEmail());
+        }
+        if (updates.getLogoUrl() != null) {
+            company.setLogoUrl(updates.getLogoUrl());
+        }
+        if (updates.getStoreStyle() != null) {
+            company.setStoreStyle(updates.getStoreStyle());
+        }
+
+        return companyRespository.save(company);
+    }
+
 }
