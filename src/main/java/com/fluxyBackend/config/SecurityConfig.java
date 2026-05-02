@@ -29,11 +29,10 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
 
-    // Multi-tenant store fix - v2
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -46,6 +45,7 @@ public class SecurityConfig {
                         .requestMatchers("/companies", "/companies/").permitAll()
                         .requestMatchers("/store/**").permitAll()
                         .requestMatchers("/me/**").permitAll()
+                        .requestMatchers("/payments/webhook").permitAll() // ← webhook público
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session ->
