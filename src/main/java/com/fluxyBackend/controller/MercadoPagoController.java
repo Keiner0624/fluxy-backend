@@ -77,9 +77,9 @@ public class MercadoPagoController {
                     .build();
 
             PreferenceBackUrlsRequest backUrls = PreferenceBackUrlsRequest.builder()
-                    .success(frontendUrl + "/dashboard?payment=success&plan=" + planStr + "&months=" + months)
-                    .failure(frontendUrl + "/dashboard?payment=failure")
-                    .pending(frontendUrl + "/dashboard?payment=pending")
+                    .success(frontendUrl + "/dashboard?payment=approved&plan=" + planStr)
+                    .failure(frontendUrl + "/dashboard?payment=rejected")
+                    .pending(frontendUrl + "/dashboard?payment=in_process")
                     .build();
 
             // Metadata para el webhook
