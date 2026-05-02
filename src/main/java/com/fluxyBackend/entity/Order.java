@@ -20,6 +20,8 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String customerName;
+    private String customerPhone;
+    private String customerAddress;
     private Double total;
     private LocalDateTime createdAt;
 

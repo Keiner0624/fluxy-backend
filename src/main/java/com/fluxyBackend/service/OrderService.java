@@ -81,6 +81,8 @@ public class OrderService {
     public Order createOrderAsClient(CreateOrderRequest request, Company company) {
         Order order = new Order();
         order.setCustomerName(request.customerName);
+        order.setCustomerPhone(request.customerPhone);
+        order.setCustomerAddress(request.customerAddress);
         order.setCreatedAt(LocalDateTime.now());
         order.setStatus(OrderStatus.PENDING);
         order.setCompany(company);
