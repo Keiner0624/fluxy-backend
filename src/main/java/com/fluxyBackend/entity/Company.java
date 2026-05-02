@@ -6,12 +6,21 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class Company {
+
+    // ─── Plan ────────────────────────────────────────────────────────────────
+    public enum Plan {
+        FREE, PRO, BUSINESS
+    }
+
+    // ─── Campos existentes ───────────────────────────────────────────────────
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -29,6 +38,16 @@ public class Company {
     @Column(columnDefinition = "TEXT")
     private String paymentMethods;
 
+    // ─── Campos nuevos de plan ───────────────────────────────────────────────
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = true, columnDefinition = "VARCHAR(255) DEFAULT 'FREE'")
+    @Builder.Default
+    private Plan plan = Plan.FREE;
+
+    private LocalDateTime planActivatedAt;
+    private LocalDateTime planExpiresAt;
+
+    // ─── Getters/Setters existentes (se mantienen por compatibilidad) ────────
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -61,4 +80,14 @@ public class Company {
 
     public String getPaymentMethods() { return paymentMethods; }
     public void setPaymentMethods(String paymentMethods) { this.paymentMethods = paymentMethods; }
+
+    // ─── Getters/Setters nuevos de plan ─────────────────────────────────────
+    public Plan getPlan() { return plan; }
+    public void setPlan(Plan plan) { this.plan = plan; }
+
+    public LocalDateTime getPlanActivatedAt() { return planActivatedAt; }
+    public void setPlanActivatedAt(LocalDateTime planActivatedAt) { this.planActivatedAt = planActivatedAt; }
+
+    public LocalDateTime getPlanExpiresAt() { return planExpiresAt; }
+    public void setPlanExpiresAt(LocalDateTime planExpiresAt) { this.planExpiresAt = planExpiresAt; }
 }

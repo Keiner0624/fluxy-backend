@@ -1,13 +1,16 @@
 package com.fluxyBackend.service;
 
+import com.fluxyBackend.entity.Company;
 import com.fluxyBackend.entity.Prodcut;
 import com.fluxyBackend.entity.User;
+import com.fluxyBackend.exception.ProductLimitException;
 import com.fluxyBackend.repository.ProductRepository;
 import com.fluxyBackend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -17,10 +20,24 @@ public class ProductService {
     private User getUserByEmail(String email) {
         return userRepository.findByEmailIgnoreCase(email).orElseThrow(() -> new RuntimeException("User not found"));
     }
+    private static final Map<Company.Plan, Integer> PLAN_LIMITS = Map.of(
+            Company.Plan.FREE, 10,
+            Company.Plan.PRO, 100,
+            Company.Plan.BUSINESS, 999999
+    );
     public Prodcut createProduct(Prodcut product, String email) {
         User user = getUserByEmail(email);
         product.setCompany(user.getCompany());
         product.setOwner(user);
+
+        Company company = user.getCompany();
+        Company.Plan plan = (company.getPlan() != null) ? company.getPlan() : Company.Plan.FREE;
+        int limit = PLAN_LIMITS.get(plan);
+        int current = prodcutRepository.findByCompany(company).size();
+
+        if (current >= limit) {
+            throw new ProductLimitException(limit, current, plan.name());
+        }
         return prodcutRepository.save(product);
     }
     public List<Prodcut> getAll(String email) {
