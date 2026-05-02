@@ -59,6 +59,10 @@ public class CompanyController {
             company.setStoreStyle(config.getStoreStyle());
         if (config.getPrimaryColor() != null)
             company.setPrimaryColor(config.getPrimaryColor());
+        if (config.getPaymentMethods() != null)
+            company.setPaymentMethods(config.getPaymentMethods());
+        if (config.getLogoUrl() != null)
+            company.setLogoUrl(config.getLogoUrl());
 
         return companyRepository.save(company);
     }

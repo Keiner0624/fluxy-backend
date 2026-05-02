@@ -26,43 +26,39 @@ public class Company {
     private String logoUrl;
     @Column(columnDefinition = "TEXT")
     private String storeStyle;
+    @Column(columnDefinition = "TEXT")
+    private String paymentMethods;
 
-    public Long getId() {
-        return id;
-    }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
 
-    public String getName() {
-        return name;
-    }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
 
-    public void setName(String name) {
-        this.name = name;
-    }
+    public String getSlug() { return slug; }
+    public void setSlug(String slug) { this.slug = slug; }
 
-    public String getEmail() {
-        return email;
-    }
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
 
-    public void setEmail(String email) {
-        this.email = email;
-    }
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
 
-    public String getSlug() {
-        return slug;
-    }
-    public void setSlug(String slug) {
-        this.slug = slug;
-    }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
-    public String getStoreStyle() {
-        return storeStyle;
-    }
+    public String getPrimaryColor() { return primaryColor; }
+    public void setPrimaryColor(String primaryColor) { this.primaryColor = primaryColor; }
 
-    public void setStoreStyle(String storeStyle) {
-        this.storeStyle = storeStyle;
-    }
+    public String getLogoUrl() { return logoUrl; }
+    public void setLogoUrl(String logoUrl) { this.logoUrl = logoUrl; }
+
+    public String getStoreStyle() { return storeStyle; }
+    public void setStoreStyle(String storeStyle) { this.storeStyle = storeStyle; }
+
+    public String getPaymentMethods() { return paymentMethods; }
+    public void setPaymentMethods(String paymentMethods) { this.paymentMethods = paymentMethods; }
 }
