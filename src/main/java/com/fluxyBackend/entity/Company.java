@@ -39,8 +39,11 @@ public class Company {
     private String paymentMethods;
 
     // ─── Campos nuevos de plan ───────────────────────────────────────────────
+    // ─── Dominio personalizado (plan BUSINESS) ───────────────────────────────
+    private String customDomain;
+
     @Enumerated(EnumType.STRING)
-    @Column(nullable = true, columnDefinition = "VARCHAR(255) DEFAULT 'FREE'")
+    @Column(nullable = false)
     @Builder.Default
     private Plan plan = Plan.FREE;
 
@@ -80,6 +83,10 @@ public class Company {
 
     public String getPaymentMethods() { return paymentMethods; }
     public void setPaymentMethods(String paymentMethods) { this.paymentMethods = paymentMethods; }
+
+    // ─── Getter/Setter customDomain ──────────────────────────────────────────
+    public String getCustomDomain() { return customDomain; }
+    public void setCustomDomain(String customDomain) { this.customDomain = customDomain; }
 
     // ─── Getters/Setters nuevos de plan ─────────────────────────────────────
     public Plan getPlan() { return plan; }
