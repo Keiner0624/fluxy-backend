@@ -7,10 +7,13 @@ import com.fluxyBackend.entity.Prodcut;
 import com.fluxyBackend.repository.CompanyRepository;
 import com.fluxyBackend.repository.ProductRepository;
 import com.fluxyBackend.service.OrderService;
+import com.fluxyBackend.service.WhatsAppService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/store")
@@ -20,8 +23,9 @@ public class StoreController {
     private final ProductRepository productRepository;
     private final CompanyRepository companyRepository;
     private final OrderService orderService;
+    private final WhatsAppService whatsAppService;
 
-    // Catálogo público de productos por empresa
+    // ─── Catálogo público de productos ───────────────────────────────────────
     @GetMapping("/{companyId}/products")
     public List<Prodcut> getProducts(@PathVariable Long companyId) {
         Company company = companyRepository.findById(companyId)
@@ -29,20 +33,37 @@ public class StoreController {
         return productRepository.findByCompany(company);
     }
 
-    // Crear orden como cliente (sin token)
+    // ─── Crear orden como cliente (por ID) ───────────────────────────────────
     @PostMapping("/{companyId}/order")
-    public Order createOrder(@PathVariable Long companyId,
-                             @RequestBody CreateOrderRequest request) {
+    public Map<String, Object> createOrder(@PathVariable Long companyId,
+                                           @RequestBody CreateOrderRequest request) {
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
-        return orderService.createOrderAsClient(request, company);
+
+        Order order = orderService.createOrderAsClient(request, company);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("order", order);
+        response.put("orderId", order.getId());
+        response.put("total", order.getTotal());
+
+        // ✅ WhatsApp URL solo si el plan es PRO o BUSINESS
+        String whatsappUrl = orderService.generateWhatsAppUrl(order, company);
+        if (whatsappUrl != null) {
+            response.put("whatsappUrl", whatsappUrl);
+        }
+
+        return response;
     }
+
+    // ─── Info de empresa ──────────────────────────────────────────────────────
     @GetMapping("/{companyId}/info")
     public Company getCompanyInfo(@PathVariable Long companyId) {
         return companyRepository.findById(companyId)
                 .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
     }
 
+    // ─── Por slug ─────────────────────────────────────────────────────────────
     @GetMapping("/slug/{slug}/info")
     public Company getBySlug(@PathVariable String slug) {
         return companyRepository.findBySlug(slug)
@@ -56,10 +77,26 @@ public class StoreController {
         return productRepository.findByCompany(company);
     }
 
-    @PostMapping("/slug{slug}/order")
-    public Order createOrderBySlug(@PathVariable String slug, @RequestBody CreateOrderRequest request) {
+    // ─── Crear orden por slug ─────────────────────────────────────────────────
+    @PostMapping("/slug/{slug}/order")
+    public Map<String, Object> createOrderBySlug(@PathVariable String slug,
+                                                 @RequestBody CreateOrderRequest request) {
         Company company = companyRepository.findBySlug(slug)
                 .orElseThrow(() -> new RuntimeException("Tienda no encontrada"));
-        return orderService.createOrderAsClient(request, company);
+
+        Order order = orderService.createOrderAsClient(request, company);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("order", order);
+        response.put("orderId", order.getId());
+        response.put("total", order.getTotal());
+
+        // ✅ WhatsApp URL solo si el plan es PRO o BUSINESS
+        String whatsappUrl = orderService.generateWhatsAppUrl(order, company);
+        if (whatsappUrl != null) {
+            response.put("whatsappUrl", whatsappUrl);
+        }
+
+        return response;
     }
 }

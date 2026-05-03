@@ -9,6 +9,8 @@ import com.fluxyBackend.response.OrderItemResponse;
 import com.fluxyBackend.response.OrderRespose;
 import com.fluxyBackend.response.ProductResponse;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -22,10 +24,16 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class OrderService {
+
+    private static final Logger log = LoggerFactory.getLogger(OrderService.class);
+
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
+    private final WhatsAppService whatsAppService;
+
+    private static final List<String> PRO_PLANS = List.of("PRO", "BUSINESS");
 
     private User getUserByEmail(String email) {
         return userRepository.findByEmailIgnoreCase(email)
@@ -118,6 +126,7 @@ public class OrderService {
         order.setTotal(total);
         Order savedOrder = orderRepository.save(order);
 
+        // ─── Notificaciones en background ────────────────────────────────────
         new Thread(() -> {
             try {
                 userRepository.findAll()
@@ -125,17 +134,50 @@ public class OrderService {
                         .filter(u -> u.getCompany() != null &&
                                 u.getCompany().getId().equals(company.getId()))
                         .findFirst()
-                        .ifPresent(owner -> emailService.sendOrderNotification(
-                                owner.getEmail(),
-                                owner.getFullName(),
-                                savedOrder  // ← pasa el objeto Order completo
-                        ));
+                        .ifPresent(owner -> {
+                            // ✅ Email (siempre)
+                            emailService.sendOrderNotification(
+                                    owner.getEmail(),
+                                    owner.getFullName(),
+                                    savedOrder
+                            );
+
+                            // ✅ WhatsApp (solo plan PRO o BUSINESS)
+                            String plan = company.getPlan() != null
+                                    ? company.getPlan().name() : "FREE";
+
+                            if (PRO_PLANS.contains(plan)) {
+                                String phone = company.getPhone();
+                                if (phone != null && !phone.isBlank()) {
+                                    whatsAppService.sendWhatsAppNotification(
+                                            phone, savedOrder, company
+                                    );
+                                    log.info("📱 WhatsApp enviado para pedido #{} — empresa {}",
+                                            savedOrder.getId(), company.getName());
+                                }
+                            } else {
+                                log.info("ℹ️ WhatsApp omitido para pedido #{} — plan FREE",
+                                        savedOrder.getId());
+                            }
+                        });
             } catch (Exception e) {
-                System.out.println("Error enviando email: " + e.getMessage());
+                log.error("Error en notificaciones pedido #{}: {}", savedOrder.getId(), e.getMessage());
             }
         }).start();
 
-        return savedOrder; // ← retorna inmediatamente sin esperar el email
+        return savedOrder;
+    }
+
+    // ─── Generar URL de WhatsApp para el cliente (retornar al frontend) ───────
+    public String generateWhatsAppUrl(Order order, Company company) {
+        String plan = company.getPlan() != null ? company.getPlan().name() : "FREE";
+        if (!PRO_PLANS.contains(plan)) return null;
+
+        String phone = company.getPhone();
+        if (phone == null || phone.isBlank()) return null;
+
+        String message = whatsAppService.buildOrderMessage(order, company);
+        return whatsAppService.buildWhatsAppUrl(phone, message);
     }
 
     public List<Order> getOrder(String email) {
@@ -179,12 +221,10 @@ public class OrderService {
         Order order = orderRepository.findByIdAndCompany(id, user.getCompany())
                 .orElseThrow(() -> new RuntimeException("Pedido no encontrado"));
 
-        if (order.getStatus() == OrderStatus.COMPLETED) {
+        if (order.getStatus() == OrderStatus.COMPLETED)
             throw new RuntimeException("El pedido ya está completado.");
-        }
-        if (order.getStatus() == OrderStatus.CANCELLED) {
+        if (order.getStatus() == OrderStatus.CANCELLED)
             throw new RuntimeException("No puedes completar un pedido cancelado.");
-        }
 
         order.setStatus(OrderStatus.COMPLETED);
         orderRepository.save(order);
@@ -275,7 +315,7 @@ public class OrderService {
             startDate = LocalDateTime.now().minusMonths(1);
         }
 
-        Map<String, int[]> counter = new HashMap<>(); // [quantity, revenue*100]
+        Map<String, int[]> counter = new HashMap<>();
 
         for (Order order : orderRepository.findByCompany(user.getCompany())) {
             if (order.getStatus() != OrderStatus.COMPLETED) continue;
@@ -301,6 +341,4 @@ public class OrderService {
                 })
                 .toList();
     }
-
 }
-
