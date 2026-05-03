@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
+
 @RestController
 @RequestMapping("/me")
 @RequiredArgsConstructor
@@ -28,18 +30,21 @@ public class UserController {
         int productLimit = switch (plan) {
             case PRO      -> 100;
             case BUSINESS -> 999999;
-            default       -> 10;       // FREE
+            default       -> 10;
         };
 
+        LocalDateTime expiresAt = user.getCompany() != null
+                ? user.getCompany().getPlanExpiresAt()
+                : null;
+
         return new Object() {
-            public final String fullName    = user.getFullName();
-            public final String email       = user.getEmail();
-            public final String companyName = user.getCompany() != null
-                    ? user.getCompany().getName() : "";
-            public final Long   companyId   = user.getCompany() != null
-                    ? user.getCompany().getId() : null;
-            public final String planName    = plan.name();          // "FREE" | "PRO" | "BUSINESS"
-            public final int    planLimit   = productLimit;          // 10 | 100 | 999999
+            public final String        fullName      = user.getFullName();
+            public final String        email         = user.getEmail();
+            public final String        companyName   = user.getCompany() != null ? user.getCompany().getName() : "";
+            public final Long          companyId     = user.getCompany() != null ? user.getCompany().getId() : null;
+            public final String        planName      = plan.name();
+            public final int           planLimit     = productLimit;
+            public final LocalDateTime planExpiresAt = expiresAt;   // ← nuevo
         };
     }
 }
