@@ -45,7 +45,7 @@ public class SecurityConfig {
                         .requestMatchers("/companies", "/companies/").permitAll()
                         .requestMatchers("/store/**").permitAll()
                         .requestMatchers("/me/**").permitAll()
-                        .requestMatchers("/payments/webhook").permitAll() // ← webhook público
+                        .requestMatchers("/payments/webhook").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session ->
