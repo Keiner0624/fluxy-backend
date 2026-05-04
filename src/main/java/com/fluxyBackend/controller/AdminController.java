@@ -3,9 +3,8 @@ package com.fluxyBackend.controller;
 import com.fluxyBackend.entity.Company;
 import com.fluxyBackend.entity.Role;
 import com.fluxyBackend.entity.User;
-import com.fluxyBackend.repository.CompanyRepository;
-import com.fluxyBackend.repository.OrderRepository;
-import com.fluxyBackend.repository.UserRepository;
+import com.fluxyBackend.repository.*;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -22,6 +21,8 @@ public class AdminController {
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
     private final OrderRepository orderRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final ProductRepository productRepository;
 
     //Verificar que el usuario sea admin
     private User requireAdmin(Authentication authentication){
@@ -101,12 +102,19 @@ public class AdminController {
     }
 
     @DeleteMapping("/vendors/{companyId}")
+    @Transactional
     public ResponseEntity<Map<String, String>> deleteVendor(@PathVariable Long companyId, Authentication authentication){
         requireAdmin(authentication);
 
         Company company = companyRepository.findById(companyId)
                         .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
         List<User> users = userRepository.findByCompanyId(companyId);
+        for (User user : users) {
+            passwordResetTokenRepository.deleteByUser_Email(user.getEmail());
+        }
+        orderRepository.deleteOrderItemsByCompanyId(companyId);
+        orderRepository.deleteOrdersByCompanyId(companyId);
+        productRepository.deleteByCompanyId(companyId);
         userRepository.deleteAll(users);
         companyRepository.deleteById(companyId);
         return ResponseEntity.ok(Map.of("message", "Empresa eliminada"));
