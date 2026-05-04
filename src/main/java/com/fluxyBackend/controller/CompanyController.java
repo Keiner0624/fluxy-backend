@@ -6,6 +6,7 @@ import com.fluxyBackend.entity.User;
 import com.fluxyBackend.repository.CompanyRepository;
 import com.fluxyBackend.repository.UserRepository;
 import com.fluxyBackend.service.CompanyService;
+import com.fluxyBackend.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -19,9 +20,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CompanyController {
 
-    private final CompanyService companyService;
-    private final UserRepository userRepository;
-    private final CompanyRepository companyRepository;
+    private final CompanyService     companyService;
+    private final UserRepository     userRepository;
+    private final CompanyRepository  companyRepository;
+    private final EmailService       emailService;
 
     // ─── Crear empresa ───────────────────────────────────────────────────────
     @PostMapping
@@ -82,9 +84,7 @@ public class CompanyController {
         return user.getCompany();
     }
 
-    // ─── Actualizar plan (activación manual por Yape/Plin) ───────────────────
-    // PUT /companies/plan
-    // Body: { "plan": "PRO", "months": 1 }
+    // ─── Actualizar plan ─────────────────────────────────────────────────────
     @PutMapping("/plan")
     public Company updatePlan(@RequestBody Map<String, String> body,
                               Authentication authentication) {
@@ -93,34 +93,44 @@ public class CompanyController {
 
         Company company = user.getCompany();
 
-        // Validar plan
         String planStr = body.get("plan");
-        if (planStr == null || planStr.isBlank()) {
+        if (planStr == null || planStr.isBlank())
             throw new RuntimeException("El campo 'plan' es requerido.");
-        }
 
         Plan plan;
         try {
             plan = Plan.valueOf(planStr.toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Plan inválido: '" + planStr + "'. Valores válidos: FREE, PRO, BUSINESS.");
+            throw new RuntimeException("Plan inválido: '" + planStr + "'.");
         }
 
-        // Meses (por defecto 1)
         int months = 1;
         if (body.containsKey("months")) {
+            try { months = Integer.parseInt(body.get("months")); }
+            catch (NumberFormatException e) { throw new RuntimeException("'months' debe ser un número."); }
+        }
+
+        LocalDateTime expiresAt = LocalDateTime.now().plusMonths(months);
+        company.setPlan(plan);
+        company.setPlanActivatedAt(LocalDateTime.now());
+        company.setPlanExpiresAt(expiresAt);
+        companyRepository.save(company);
+
+        // ✅ Enviar email de confirmación
+        if (plan != Plan.FREE) {
             try {
-                months = Integer.parseInt(body.get("months"));
-            } catch (NumberFormatException e) {
-                throw new RuntimeException("El campo 'months' debe ser un número entero.");
+                emailService.sendPlanActivatedEmail(
+                        user.getEmail(),
+                        user.getFullName(),
+                        plan.name(),
+                        expiresAt
+                );
+            } catch (Exception e) {
+                // No crítico — el plan ya se activó
+                System.err.println("⚠️ No se pudo enviar email de confirmación: " + e.getMessage());
             }
         }
 
-        // Aplicar plan
-        company.setPlan(plan);
-        company.setPlanActivatedAt(LocalDateTime.now());
-        company.setPlanExpiresAt(LocalDateTime.now().plusMonths(months));
-
-        return companyRepository.save(company);
+        return company;
     }
 }
