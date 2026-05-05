@@ -22,6 +22,9 @@ public class Prodcut {
     private int stock;
     private String imageUrl;
 
+    @Column(columnDefinition = "TEXT")
+    private String images;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false)
     @JsonIgnore
