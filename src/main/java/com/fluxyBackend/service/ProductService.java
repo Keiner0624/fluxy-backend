@@ -17,14 +17,18 @@ import java.util.Map;
 public class ProductService {
     private final ProductRepository prodcutRepository;
     private final UserRepository userRepository;
+
     private User getUserByEmail(String email) {
-        return userRepository.findByEmailIgnoreCase(email).orElseThrow(() -> new RuntimeException("User not found"));
+        return userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
     }
+
     private static final Map<Company.Plan, Integer> PLAN_LIMITS = Map.of(
             Company.Plan.FREE, 10,
             Company.Plan.PRO, 100,
             Company.Plan.BUSINESS, 999999
     );
+
     public Prodcut createProduct(Prodcut product, String email) {
         User user = getUserByEmail(email);
         product.setCompany(user.getCompany());
@@ -40,27 +44,40 @@ public class ProductService {
         }
         return prodcutRepository.save(product);
     }
+
     public List<Prodcut> getAll(String email) {
         User user = getUserByEmail(email);
         return prodcutRepository.findByCompany(user.getCompany());
     }
+
     public Prodcut update(Long id, Prodcut update, String email) {
         User user = getUserByEmail(email);
-        Prodcut prodcut = prodcutRepository.findByIdAndCompany(id,user.getCompany())
+        Prodcut prodcut = prodcutRepository.findByIdAndCompany(id, user.getCompany())
                 .orElseThrow(() -> new RuntimeException("Prodcuts not found"));
+
         prodcut.setName(update.getName());
         prodcut.setPrice(update.getPrice());
         prodcut.setStock(update.getStock());
+
+        // ✅ Fix: guardar description, imageUrl e images
+        if (update.getDescription() != null)
+            prodcut.setDescription(update.getDescription());
+        if (update.getImageUrl() != null)
+            prodcut.setImageUrl(update.getImageUrl());
+        if (update.getImages() != null)
+            prodcut.setImages(update.getImages());
+
         return prodcutRepository.save(prodcut);
     }
+
     public void delete(Long id, String email) {
         User user = getUserByEmail(email);
-        Prodcut prodcut = prodcutRepository.findByIdAndCompany(id, user.getCompany()).
-                orElseThrow(() -> new RuntimeException("Prodcuts not found"));
+        Prodcut prodcut = prodcutRepository.findByIdAndCompany(id, user.getCompany())
+                .orElseThrow(() -> new RuntimeException("Prodcuts not found"));
         prodcutRepository.delete(prodcut);
     }
 
-    public int conuntProducts(String email){
+    public int conuntProducts(String email) {
         User user = getUserByEmail(email);
         return prodcutRepository.findByCompany(user.getCompany()).size();
     }
