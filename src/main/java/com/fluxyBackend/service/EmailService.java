@@ -89,7 +89,7 @@ public class EmailService {
                 <!-- Cuerpo -->
                 <div style="padding:36px 32px;">
                   <p style="color:#374151; font-size:17px; margin:0 0 8px; font-weight:700;">
-                    ¡Hola, %s! 
+                    ¡Hola, %s! 🎉
                   </p>
                   <p style="color:#6b7280; font-size:14px; margin:0 0 24px; line-height:1.7;">
                     Tu pago fue procesado correctamente y tu plan <strong style="color:%s;">%s %s</strong> ya está activo en tu cuenta de Fluxy.
@@ -230,7 +230,7 @@ public class EmailService {
 
                 <!-- Header -->
                 <div style="background:linear-gradient(135deg,#7c83fd,#4f46e5); padding:28px 32px; text-align:center;">
-                  <div style="font-size:36px; margin-bottom:8px;"></div>
+                  <div style="font-size:36px; margin-bottom:8px;">🛒</div>
                   <div style="font-size:24px; font-weight:900; color:white; letter-spacing:3px; margin-bottom:4px;">FLUXY</div>
                   <div style="color:rgba(255,255,255,0.85); font-size:14px;">¡Tienes un nuevo pedido!</div>
                 </div>
@@ -238,7 +238,7 @@ public class EmailService {
                 <!-- Cuerpo -->
                 <div style="padding:32px;">
                   <p style="color:#374151; font-size:16px; margin:0 0 20px;">
-                    Hola <strong>%s</strong>, recibiste un nuevo pedido 
+                    Hola <strong>%s</strong>, recibiste un nuevo pedido 🎉
                   </p>
 
                   <!-- Info del cliente -->
@@ -310,7 +310,7 @@ public class EmailService {
             <body style="margin:0; padding:0; background:#f4f4f8; font-family:'Segoe UI', Arial, sans-serif;">
               <div style="max-width:560px; margin:40px auto; background:white; border-radius:16px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08);">
                 <div style="background:linear-gradient(135deg,#f87171,#ef4444); padding:32px; text-align:center;">
-                  <div style="font-size:40px; margin-bottom:10px;"></div>
+                  <div style="font-size:40px; margin-bottom:10px;">😔</div>
                   <div style="font-size:24px; font-weight:900; color:white; letter-spacing:3px; margin-bottom:4px;">FLUXY</div>
                   <div style="color:rgba(255,255,255,0.9); font-size:14px;">Tu plan ha vencido</div>
                 </div>
@@ -347,6 +347,57 @@ public class EmailService {
         """.formatted(toName, planLabel, java.time.LocalDateTime.now().getYear());
 
         send(toEmail, toName, "Tu plan " + planLabel + " ha vencido — Fluxy", html);
+    }
+
+
+    // ─── Email de trial activado ──────────────────────────────────────────────
+    public void sendTrialActivatedEmail(String toEmail, String toName, java.time.LocalDateTime expiresAt) {
+        String expiraStr = expiresAt.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        String html = """
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="UTF-8"></head>
+            <body style="margin:0; padding:0; background:#f4f4f8; font-family:'Segoe UI', Arial, sans-serif;">
+              <div style="max-width:560px; margin:40px auto; background:white; border-radius:16px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+                <div style="background:linear-gradient(135deg,#7c83fd,#4f46e5); padding:36px 32px; text-align:center;">
+                  <div style="font-size:48px; margin-bottom:12px;">🎉</div>
+                  <div style="font-size:26px; font-weight:900; color:white; letter-spacing:3px; margin-bottom:6px;">FLUXY</div>
+                  <div style="color:rgba(255,255,255,0.85); font-size:15px; font-weight:600;">¡Tu prueba gratuita está activa!</div>
+                </div>
+                <div style="padding:36px 32px;">
+                  <p style="color:#374151; font-size:17px; margin:0 0 16px; font-weight:700;">¡Hola, %s! 🚀</p>
+                  <p style="color:#6b7280; font-size:14px; margin:0 0 24px; line-height:1.7;">
+                    Tu prueba gratuita del <strong style="color:#7c83fd;">Plan Pro</strong> está activa por <strong>1 mes completo</strong>. Disfruta todas las funciones premium sin costo.
+                  </p>
+                  <div style="background:#f9fafb; border:2px solid #7c83fd; border-radius:12px; padding:20px 24px; margin-bottom:24px;">
+                    <div style="font-size:12px; color:#6b7280; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; font-weight:700;">Lo que tienes disponible</div>
+                    <ul style="color:#374151; font-size:14px; line-height:2; padding-left:20px; margin:0;">
+                      <li>📦 Hasta 100 productos</li>
+                      <li>💬 WhatsApp automático al recibir pedidos</li>
+                      <li>📊 Estadísticas completas de ventas</li>
+                      <li>🎨 Personalización avanzada de tu tienda</li>
+                    </ul>
+                  </div>
+                  <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:12px; padding:14px 18px; margin-bottom:24px;">
+                    <div style="font-size:13px; color:#9a3412;">
+                       Tu prueba vence el <strong>%s</strong>. Después volverás al plan Free si no renuevas.
+                    </div>
+                  </div>
+                  <div style="text-align:center;">
+                    <a href="https://fluxyweb.com/dashboard" style="display:inline-block; background:linear-gradient(135deg,#7c83fd,#4f46e5); color:white; padding:14px 32px; border-radius:12px; font-weight:700; font-size:15px; text-decoration:none;">
+                      Ir a mi panel →
+                    </a>
+                  </div>
+                </div>
+                <div style="background:#f9fafb; border-top:1px solid #e5e7eb; padding:16px 32px; text-align:center;">
+                  <div style="font-size:12px; color:#9ca3af;">© %d <strong style="color:#7c83fd;">Fluxy</strong></div>
+                </div>
+              </div>
+            </body>
+            </html>
+        """.formatted(toName, expiraStr, java.time.LocalDateTime.now().getYear());
+
+        send(toEmail, toName, "🎉 ¡Tu prueba gratuita de Fluxy Pro está activa!", html);
     }
 
 }

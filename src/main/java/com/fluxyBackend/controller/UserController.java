@@ -37,6 +37,8 @@ public class UserController {
                 ? user.getCompany().getPlanExpiresAt()
                 : null;
 
+        boolean hasUsedTrial = user.getCompany() != null && user.getCompany().isTrialUsed();
+
         return new Object() {
             public final String        fullName      = user.getFullName();
             public final String        email         = user.getEmail();
@@ -44,7 +46,8 @@ public class UserController {
             public final Long          companyId     = user.getCompany() != null ? user.getCompany().getId() : null;
             public final String        planName      = plan.name();
             public final int           planLimit     = productLimit;
-            public final LocalDateTime planExpiresAt = expiresAt;   // ← nuevo
+            public final LocalDateTime planExpiresAt = expiresAt;
+            public final boolean       trialUsed     = hasUsedTrial;
         };
     }
 }

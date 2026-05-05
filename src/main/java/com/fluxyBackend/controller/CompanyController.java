@@ -7,7 +7,9 @@ import com.fluxyBackend.repository.CompanyRepository;
 import com.fluxyBackend.repository.UserRepository;
 import com.fluxyBackend.service.CompanyService;
 import com.fluxyBackend.service.EmailService;
+import com.fluxyBackend.service.EmailService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -133,4 +135,53 @@ public class CompanyController {
 
         return company;
     }
+
+    // ─── Activar trial gratuito PRO por 1 mes ────────────────────────────────
+    // POST /companies/trial
+    @PostMapping("/trial")
+    public ResponseEntity<Map<String, Object>> activateTrial(Authentication authentication) {
+        User user = userRepository.findByEmailIgnoreCase(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        Company company = user.getCompany();
+
+        // Verificar que no haya usado el trial antes
+        if (company.isTrialUsed()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Ya utilizaste tu período de prueba gratuito."
+            ));
+        }
+
+        // Verificar que esté en plan FREE
+        if (company.getPlan() != Plan.FREE) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Ya tienes un plan activo."
+            ));
+        }
+
+        // Activar PRO por 1 mes
+        java.time.LocalDateTime expiresAt = java.time.LocalDateTime.now().plusMonths(1);
+        company.setPlan(Plan.PRO);
+        company.setPlanActivatedAt(java.time.LocalDateTime.now());
+        company.setPlanExpiresAt(expiresAt);
+        company.setTrialUsed(true);
+        companyRepository.save(company);
+
+        // Enviar email de confirmación
+        try {
+            emailService.sendTrialActivatedEmail(user.getEmail(), user.getFullName(), expiresAt);
+        } catch (Exception e) {
+            System.err.println("Error enviando email de trial: " + e.getMessage());
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "¡Tu prueba gratuita de 1 mes está activa!",
+                "plan", "PRO",
+                "expiresAt", expiresAt.toString()
+        ));
+    }
+
 }

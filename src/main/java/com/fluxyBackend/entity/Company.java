@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDateTime;
 
@@ -44,11 +45,18 @@ public class Company {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @ColumnDefault("'FREE'")
     @Builder.Default
     private Plan plan = Plan.FREE;
 
     private LocalDateTime planActivatedAt;
     private LocalDateTime planExpiresAt;
+
+    // ─── Trial gratuito ──────────────────────────────────────────────────────
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean trialUsed = false;
 
     // ─── Getters/Setters existentes (se mantienen por compatibilidad) ────────
     public Long getId() { return id; }
@@ -97,4 +105,15 @@ public class Company {
 
     public LocalDateTime getPlanExpiresAt() { return planExpiresAt; }
     public void setPlanExpiresAt(LocalDateTime planExpiresAt) { this.planExpiresAt = planExpiresAt; }
+
+    public boolean isTrialUsed() { return trialUsed; }
+    public void setTrialUsed(boolean trialUsed) { this.trialUsed = trialUsed; }
+
+    @PrePersist
+    @PreUpdate
+    private void applyDefaults() {
+        if (plan == null) {
+            plan = Plan.FREE;
+        }
+    }
 }
