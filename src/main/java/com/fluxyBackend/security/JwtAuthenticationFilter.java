@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -29,15 +31,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
-        String method = request.getMethod();
-
-        // Solo saltamos el filtro para rutas verdaderamente públicas
         if (path.startsWith("/auth/")) return true;
         if (path.startsWith("/store/")) return true;
         if (path.startsWith("/me/")) return true;
-        // /companies solo es público para GET (listar) y POST (crear empresa)
         if (path.equals("/companies") || path.equals("/companies/")) return true;
-
         return false;
     }
 
@@ -45,6 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+
         String path = request.getRequestURI();
         if (path.startsWith("/auth/")) {
             filterChain.doFilter(request, response);
@@ -52,48 +50,51 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         final String authHeader = request.getHeader("Authorization");
-        System.out.println("==== DEBUG JWT ====");
-        System.out.println("METHOD: " + request.getMethod());
-        System.out.println("URL: " + request.getRequestURI());
-        System.out.println("AUTH HEADER: " + authHeader);
-        System.out.println("===================");
-        final String jwt;
-        final String userEmail;
-
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        jwt = authHeader.substring(7).trim();
+        final String jwt = authHeader.substring(7).trim();
         if (jwt.isBlank() || !jwt.contains(".")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        System.out.println("POST HEADER: " + request.getHeader("Authorization"));
-        System.out.println("METHOD: " + request.getMethod());
-
         try {
-            userEmail = jwtService.extractUsername(jwt);
+            String userEmail = jwtService.extractUsername(jwt);
 
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
 
-                if (jwtService.isTokenValid(jwt, userDetails.getUsername())) {
+                // ─── Token de admin (sin cuenta en BD) ───────────────────────
+                String adminEmail = System.getenv("ADMIN_EMAIL");
+                if (adminEmail != null && userEmail.equalsIgnoreCase(adminEmail.trim())
+                        && jwtService.isAdminToken(jwt)) {
+
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities()
+                                    userEmail, null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
                             );
-
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
+
+                } else {
+                    // ─── Token normal de vendedor ─────────────────────────────
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
+                    if (jwtService.isTokenValid(jwt, userDetails.getUsername())) {
+                        UsernamePasswordAuthenticationToken authToken =
+                                new UsernamePasswordAuthenticationToken(
+                                        userDetails, null,
+                                        userDetails.getAuthorities()
+                                );
+                        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authToken);
+                    }
                 }
             }
         } catch (JwtException | IllegalArgumentException ex) {
-            log.debug("Invalid JWT received: {}", ex.getMessage());
+            log.debug("Invalid JWT: {}", ex.getMessage());
         }
 
         filterChain.doFilter(request, response);
