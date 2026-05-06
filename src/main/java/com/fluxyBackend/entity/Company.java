@@ -109,11 +109,19 @@ public class Company {
     public boolean isTrialUsed() { return trialUsed; }
     public void setTrialUsed(boolean trialUsed) { this.trialUsed = trialUsed; }
 
+    // ─── Fecha de registro ───────────────────────────────────────────────────
+    private LocalDateTime createdAt;
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
     @PrePersist
-    @PreUpdate
     private void applyDefaults() {
-        if (plan == null) {
-            plan = Plan.FREE;
-        }
+        if (plan == null) plan = Plan.FREE;
+        if (createdAt == null) createdAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    private void onUpdate() {
+        if (plan == null) plan = Plan.FREE;
     }
 }
