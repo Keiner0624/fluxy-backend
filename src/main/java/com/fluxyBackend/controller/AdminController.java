@@ -35,22 +35,21 @@ public class AdminController {
     private final JwtService jwtService;
 
     private void requireAdmin(Authentication auth) {
-        String email = auth.getName();
+        String email      = auth.getName();
         String adminEmail = System.getenv("ADMIN_EMAIL");
 
-        // Verificar si es el admin por email de env
+        // ✅ Aceptar si el email coincide con el admin configurado en env
         if (adminEmail != null && email.equalsIgnoreCase(adminEmail.trim())) return;
 
-        // Verificar por rol en BD como fallback
-        userRepository.findByEmailIgnoreCase(email).ifPresent(user -> {
-            if (user.getRole() == Role.ADMIN) return;
-        });
+        // ✅ Aceptar si tiene rol ADMIN en la BD (fallback)
+        boolean isAdminInDb = userRepository.findByEmailIgnoreCase(email)
+                .map(u -> u.getRole() == Role.ADMIN)
+                .orElse(false);
 
-        // Rechazar si no es admin
-        userRepository.findByEmailIgnoreCase(email)
-                .filter(u -> u.getRole() == Role.ADMIN)
-                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
-                        org.springframework.http.HttpStatus.FORBIDDEN, "Acceso denegado"));
+        if (!isAdminInDb) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Acceso denegado");
+        }
     }
 
     // ─── Métricas generales ───────────────────────────────────────────────────
