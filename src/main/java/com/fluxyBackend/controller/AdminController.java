@@ -9,6 +9,7 @@ import com.fluxyBackend.repository.OrderRepository;
 import com.fluxyBackend.repository.ProductRepository;
 import com.fluxyBackend.repository.UserRepository;
 import com.fluxyBackend.repository.PasswordResetTokenRepository;
+import com.fluxyBackend.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -31,15 +32,25 @@ public class AdminController {
     private final OrderRepository              orderRepository;
     private final ProductRepository            productRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final JwtService jwtService;
 
-    private User requireAdmin(Authentication auth) {
-        User user = userRepository.findByEmailIgnoreCase(auth.getName())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        if (user.getRole() != Role.ADMIN) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.FORBIDDEN, "Acceso denegado");
-        }
-        return user;
+    private void requireAdmin(Authentication auth) {
+        String email = auth.getName();
+        String adminEmail = System.getenv("ADMIN_EMAIL");
+
+        // Verificar si es el admin por email de env
+        if (adminEmail != null && email.equalsIgnoreCase(adminEmail.trim())) return;
+
+        // Verificar por rol en BD como fallback
+        userRepository.findByEmailIgnoreCase(email).ifPresent(user -> {
+            if (user.getRole() == Role.ADMIN) return;
+        });
+
+        // Rechazar si no es admin
+        userRepository.findByEmailIgnoreCase(email)
+                .filter(u -> u.getRole() == Role.ADMIN)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN, "Acceso denegado"));
     }
 
     // ─── Métricas generales ───────────────────────────────────────────────────

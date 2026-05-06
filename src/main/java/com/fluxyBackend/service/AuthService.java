@@ -123,6 +123,27 @@ public class AuthService {
         return response;
     }
 
+
+    // ─── Login de administrador (sin cuenta en BD) ────────────────────────────
+    public AuthResponse adminLogin(LoginRequest request) {
+        String adminEmail    = System.getenv("ADMIN_EMAIL");
+        String adminPassword = System.getenv("ADMIN_PASSWORD");
+
+        if (adminEmail == null || adminPassword == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Credenciales de admin no configuradas.");
+        }
+
+        if (!normalizeEmail(request.email).equals(normalizeEmail(adminEmail))
+                || !request.password.equals(adminPassword)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales incorrectas.");
+        }
+
+        // Generar token con email de admin
+        String token = jwtService.generateAdminToken(normalizeEmail(adminEmail));
+        return new AuthResponse(token);
+    }
+
     private String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase();
     }
@@ -133,5 +154,6 @@ public class AuthService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+
     }
 }

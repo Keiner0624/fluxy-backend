@@ -31,4 +31,10 @@ public class AuthController {
             @RequestBody @Valid RegisterBussinesRequest request) {
         return authService.registerBusiness(request);
     }
+
+    // ─── Login exclusivo para el administrador de Fluxy ──────────────────────
+    @PostMapping("/admin-login")
+    public AuthResponse adminLogin(@RequestBody @Valid LoginRequest request) {
+        return authService.adminLogin(request);
+    }
 }

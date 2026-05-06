@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
+import java.util.Map;
 
 @Service
 public class JwtService {
@@ -27,6 +28,26 @@ public class JwtService {
                 .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
                 .signWith(getSignInKey(), SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    // ─── Token especial para admin (sin cuenta en BD) ─────────────────────────
+    public String generateAdminToken(String email) {
+        return Jwts.builder()
+                .subject(email)
+                .claims(Map.of("role", "ADMIN"))
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .signWith(getSignInKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public boolean isAdminToken(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            return "ADMIN".equals(claims.get("role", String.class));
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public String extractUsername(String token) {
