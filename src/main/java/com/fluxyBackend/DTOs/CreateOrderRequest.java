@@ -7,4 +7,5 @@ public class CreateOrderRequest {
     public String customerPhone;
     public String customerAddress;
     public List<OrderItemsRequest> items;
+    public String couponCode;
 }

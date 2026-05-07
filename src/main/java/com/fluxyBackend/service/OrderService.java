@@ -5,6 +5,8 @@ import com.fluxyBackend.entity.*;
 import com.fluxyBackend.repository.OrderRepository;
 import com.fluxyBackend.repository.ProductRepository;
 import com.fluxyBackend.repository.UserRepository;
+import com.fluxyBackend.repository.CouponRepository;
+import com.fluxyBackend.entity.Coupon;
 import com.fluxyBackend.response.OrderItemResponse;
 import com.fluxyBackend.response.OrderRespose;
 import com.fluxyBackend.response.ProductResponse;
@@ -32,6 +34,7 @@ public class OrderService {
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final WhatsAppService whatsAppService;
+    private final CouponRepository couponRepository;
 
     private static final List<String> PRO_PLANS = List.of("PRO", "BUSINESS");
 
@@ -124,6 +127,24 @@ public class OrderService {
 
         order.setItems(orderItems);
         order.setTotal(total);
+
+        // ─── Aplicar cupón si viene en el request ────────────────────────────
+        if (request.couponCode != null && !request.couponCode.isBlank()) {
+            final double baseTotal = total;
+            couponRepository.findByCodeIgnoreCaseAndCompany(request.couponCode.toUpperCase(), company)
+                    .ifPresent(coupon -> {
+                        double discount = coupon.getDiscountType() == Coupon.DiscountType.PERCENTAGE
+                                ? baseTotal * (coupon.getDiscountValue() / 100)
+                                : Math.min(coupon.getDiscountValue(), baseTotal);
+                        double finalTotal = Math.max(baseTotal - discount, 0);
+                        order.setCouponCode(coupon.getCode());
+                        order.setDiscountAmount(discount);
+                        order.setTotal(finalTotal);
+                        coupon.setUsageCount(coupon.getUsageCount() + 1);
+                        couponRepository.save(coupon);
+                    });
+        }
+
         Order savedOrder = orderRepository.save(order);
 
         // ─── Notificaciones en background ────────────────────────────────────
@@ -280,10 +301,21 @@ public class OrderService {
     }
 
     public DashborardResponse getDashborard(String email) {
+        User user = getUserByEmail(email);
+        List<Order> allOrders = orderRepository.findByCompany(user.getCompany());
+
+        long completedOrders = allOrders.stream().filter(o -> o.getStatus() == OrderStatus.COMPLETED).count();
+        long pendingOrders   = allOrders.stream().filter(o -> o.getStatus() == OrderStatus.PENDING).count();
+        double totalSales    = allOrders.stream().filter(o -> o.getStatus() == OrderStatus.COMPLETED).mapToDouble(Order::getTotal).sum();
+        double avgTicket     = completedOrders > 0 ? totalSales / completedOrders : 0;
+
         DashborardResponse response = new DashborardResponse();
-        response.totalSales = getTotalSales(email);
-        response.ordersCount = getOrdersCount(email);
-        response.topProduct = getTopProduct(email);
+        response.totalSales      = totalSales;
+        response.ordersCount     = allOrders.size();
+        response.completedOrders = completedOrders;
+        response.pendingOrders   = pendingOrders;
+        response.averageTicket   = avgTicket;
+        response.topProduct      = getTopProduct(email);
         return response;
     }
 

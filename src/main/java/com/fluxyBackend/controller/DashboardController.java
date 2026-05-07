@@ -24,7 +24,7 @@ import java.util.Map;
 public class DashboardController {
 
     private final ProductService  productService;
-    private final OrderService    orderService;
+    private final OrderService orderService;
     private final OrderRepository orderRepository;
     private final UserRepository  userRepository;
 

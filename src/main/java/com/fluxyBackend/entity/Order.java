@@ -3,8 +3,6 @@ package com.fluxyBackend.entity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
-import com.fluxyBackend.entity.Company;
-
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -24,6 +22,10 @@ public class Order {
     private String customerAddress;
     private Double total;
     private LocalDateTime createdAt;
+
+    // ─── Cupón aplicado ───────────────────────────────────────────────────────
+    private String couponCode;
+    private Double discountAmount;
 
     @Enumerated(EnumType.STRING)
     private OrderStatus status;
