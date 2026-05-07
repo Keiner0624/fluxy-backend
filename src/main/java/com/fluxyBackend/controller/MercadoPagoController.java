@@ -52,14 +52,25 @@ public class MercadoPagoController {
             User user = userRepository.findByEmailIgnoreCase(authentication.getName())
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-            String planStr = body.getOrDefault("plan", "PRO").toUpperCase();
-            int months = Integer.parseInt(body.getOrDefault("months", "1"));
+            String planStr   = body.getOrDefault("plan", "PRO").toUpperCase();
+            int    months    = Integer.parseInt(body.getOrDefault("months", "1"));
+            String currency  = body.getOrDefault("currency", "PEN");
 
-            double price = switch (planStr) {
-                case "PRO"      -> 19.0 * months;
-                case "BUSINESS" -> 39.0 * months;
+            // Precio base por plan y mes
+            double basePrice = switch (planStr) {
+                case "PRO"      -> 19.0;
+                case "BUSINESS" -> 39.0;
                 default -> throw new RuntimeException("Plan inválido");
             };
+
+            // Si el frontend envía un precio localizado, usarlo; sino usar el base
+            double price;
+            if (body.containsKey("price")) {
+                try { price = Double.parseDouble(body.get("price")) * months; }
+                catch (Exception e) { price = basePrice * months; }
+            } else {
+                price = basePrice * months;
+            }
 
             String planLabel   = planStr.equals("PRO") ? "Plan Pro" : "Plan Business";
             String description = planLabel + " — " + months + " mes" + (months > 1 ? "es" : "");
@@ -68,7 +79,7 @@ public class MercadoPagoController {
                     .title(description)
                     .quantity(1)
                     .unitPrice(BigDecimal.valueOf(price))
-                    .currencyId("PEN")
+                    .currencyId(currency)
                     .build();
 
             PreferenceBackUrlsRequest backUrls = PreferenceBackUrlsRequest.builder()
