@@ -23,7 +23,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DashboardController {
 
-    private final ProductService  productService;
+    private final ProductService productService;
     private final OrderService orderService;
     private final OrderRepository orderRepository;
     private final UserRepository  userRepository;
