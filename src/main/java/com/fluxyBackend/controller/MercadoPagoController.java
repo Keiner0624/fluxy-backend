@@ -58,8 +58,8 @@ public class MercadoPagoController {
 
             // Precio base por plan y mes
             double basePrice = switch (planStr) {
-                case "PRO"      -> 19.0;
-                case "BUSINESS" -> 39.0;
+                case "PRO"      -> 39.0;
+                case "BUSINESS" -> 59.0;
                 default -> throw new RuntimeException("Plan inválido");
             };
 
