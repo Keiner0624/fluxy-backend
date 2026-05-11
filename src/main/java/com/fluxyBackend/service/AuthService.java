@@ -91,6 +91,7 @@ public class AuthService {
 
         User user = User.builder()
                 .fullName(businessName)
+                .firstName(businessName)
                 .email(normalizedEmail)
                 .password(passwordEncoder.encode(request.password))
                 .role(Role.BUSINESS_OWNER)
