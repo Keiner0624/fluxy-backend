@@ -46,7 +46,7 @@ public class SecurityConfig {
                         .requestMatchers("/companies", "/companies/").permitAll()
                         .requestMatchers("/companies/trial").authenticated()
                         .requestMatchers("/store/**").permitAll()
-                        .requestMatchers("/me/**").permitAll()
+                        .requestMatchers("/me").permitAll()
                         .requestMatchers("/payments/webhook").permitAll()
                         .requestMatchers("/coupons/validate").permitAll()
                         .requestMatchers("/admin/**").authenticated()
