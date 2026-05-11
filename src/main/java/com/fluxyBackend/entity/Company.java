@@ -56,7 +56,7 @@ public class Company {
     @Column(nullable = false)
     @ColumnDefault("false")
     @Builder.Default
-    private boolean trialUsed = false;
+    private Boolean trialUsed = false;
 
     // ─── Getters/Setters existentes (se mantienen por compatibilidad) ────────
     public Long getId() { return id; }
@@ -106,8 +106,8 @@ public class Company {
     public LocalDateTime getPlanExpiresAt() { return planExpiresAt; }
     public void setPlanExpiresAt(LocalDateTime planExpiresAt) { this.planExpiresAt = planExpiresAt; }
 
-    public boolean isTrialUsed() { return trialUsed; }
-    public void setTrialUsed(boolean trialUsed) { this.trialUsed = trialUsed; }
+    public Boolean isTrialUsed() { return trialUsed; }
+    public void setTrialUsed(Boolean trialUsed) { this.trialUsed = trialUsed; }
 
     // ─── Fecha de registro ───────────────────────────────────────────────────
     private LocalDateTime createdAt;
