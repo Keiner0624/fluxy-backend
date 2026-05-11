@@ -7,6 +7,7 @@ import com.fluxyBackend.DTOs.TopProductResponse;
 import com.fluxyBackend.entity.Order;
 import com.fluxyBackend.response.OrderRespose;
 import com.fluxyBackend.service.OrderService;
+import com.fluxyBackend.service.PushNotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -17,11 +18,22 @@ import java.util.List;
 @RequestMapping("/orders")
 @RequiredArgsConstructor
 public class OrderController {
-    private final OrderService orderService;
+
+    private final OrderService            orderService;
+    private final PushNotificationService pushService;   // ← agregado
 
     @PostMapping
     public Order createOrder(@RequestBody CreateOrderRequest request, Authentication authentication) {
-        return orderService.createOrder(request, authentication.getName());
+        Order order = orderService.createOrder(request, authentication.getName());
+
+        // ── Notificar al vendedor en tiempo real ──────────────────────────
+        try {
+            pushService.notifyNewOrder(authentication.getName(), "#" + order.getId());
+        } catch (Exception e) {
+            // No bloquear la respuesta si el push falla
+        }
+
+        return order;
     }
 
     @GetMapping
@@ -40,7 +52,7 @@ public class OrderController {
     }
 
     @GetMapping("/total-sales")
-    public double totalSales(Authentication authentication){
+    public double totalSales(Authentication authentication) {
         return orderService.getTotalSales(authentication.getName());
     }
 
@@ -48,28 +60,31 @@ public class OrderController {
     public OrderRespose completeOrder(@PathVariable Long id, Authentication authentication) {
         return orderService.completeOrder(id, authentication.getName());
     }
+
     @GetMapping("/dashborard/orders-count")
-    public long ordersCount(Authentication authentication){
+    public long ordersCount(Authentication authentication) {
         return orderService.getOrdersCount(authentication.getName());
     }
 
     @GetMapping("/dashboard/top-product")
-    public String topProduct(Authentication authentication){
-        return  orderService.getTopProduct(authentication.getName());
+    public String topProduct(Authentication authentication) {
+        return orderService.getTopProduct(authentication.getName());
     }
 
     @GetMapping("/dashboard")
-    public DashborardResponse dashborard(Authentication authentication){
+    public DashborardResponse dashborard(Authentication authentication) {
         return orderService.getDashborard(authentication.getName());
     }
 
     @GetMapping("/dashboard/sales-per-day")
-    public List<SalesPerDayResponse> salesDay(Authentication authentication){
+    public List<SalesPerDayResponse> salesDay(Authentication authentication) {
         return orderService.getSalesPerDay(authentication.getName());
     }
+
     @GetMapping("/dashboard/top-products")
-    public List<TopProductResponse> getTopProducts(@RequestParam(defaultValue = "month") String period,
-                                                   Authentication authentication) {
+    public List<TopProductResponse> getTopProducts(
+            @RequestParam(defaultValue = "month") String period,
+            Authentication authentication) {
         return orderService.getTopProducts(authentication.getName(), period);
     }
 }
