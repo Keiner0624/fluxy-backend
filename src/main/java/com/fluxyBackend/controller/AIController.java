@@ -25,11 +25,6 @@ public class AIController {
     @Value("${anthropic.api.key}")
     private String anthropicApiKey;
 
-    /**
-     * POST /ai/describe
-     * Exclusivo para plan BUSINESS.
-     * Body: { "name": "...", "price": "...", "category": "..." }
-     */
     @PostMapping("/describe")
     public ResponseEntity<?> generateDescription(
             Authentication authentication,
@@ -56,32 +51,29 @@ public class AIController {
             return ResponseEntity.badRequest().body(Map.of("message", "El nombre del producto es obligatorio."));
         }
 
-        String prompt = """
-                Eres un experto en copywriting para e-commerce latinoamericano.
-                Genera una descripción atractiva y profesional para este producto:
-
-                - Nombre: %s
-                - Precio: S/ %s
-                - Categoría: %s
-
-                Requisitos:
-                - Máximo 2 oraciones
-                - Tono cercano y persuasivo
-                - Resalta beneficios, no características técnicas
-                - Sin emojis
-                - En español
-
-                Responde SOLO con la descripción, sin comillas ni explicaciones.
-                """.formatted(name, price.isEmpty() ? "no especificado" : price, category.isEmpty() ? "general" : category);
+        String prompt = "Eres un experto en copywriting para e-commerce latinoamericano. "
+                + "Genera una descripción atractiva y profesional para este producto: "
+                + "Nombre: " + name + ". "
+                + "Precio: S/ " + (price.isEmpty() ? "no especificado" : price) + ". "
+                + "Categoría: " + (category.isEmpty() ? "general" : category) + ". "
+                + "Requisitos: máximo 2 oraciones, tono cercano y persuasivo, "
+                + "resalta beneficios no características técnicas, sin emojis, en español. "
+                + "Responde SOLO con la descripción, sin comillas ni explicaciones.";
 
         try {
-            String requestBody = """
-                    {
-                      "model": "claude-sonnet-4-20250514",
-                      "max_tokens": 150,
-                      "messages": [{"role": "user", "content": "%s"}]
-                    }
-                    """.formatted(prompt.replace("\"", "\\\"").replace("\n", "\\n"));
+            // Escapar el prompt correctamente para JSON
+            String escapedPrompt = prompt
+                    .replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\n", "\\n")
+                    .replace("\r", "\\r")
+                    .replace("\t", "\\t");
+
+            String requestBody = "{"
+                    + "\"model\":\"claude-sonnet-4-6\","
+                    + "\"max_tokens\":150,"
+                    + "\"messages\":[{\"role\":\"user\",\"content\":\"" + escapedPrompt + "\"}]"
+                    + "}";
 
             HttpClient client = HttpClient.newHttpClient();
             HttpRequest request = HttpRequest.newBuilder()
@@ -95,22 +87,70 @@ public class AIController {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() != 200) {
+                System.err.println("Anthropic API error " + response.statusCode() + ": " + response.body());
                 return ResponseEntity.status(502).body(Map.of("message", "Error al contactar la IA. Intenta de nuevo."));
             }
 
-            // Extraer texto del JSON de respuesta
+            // Extraer texto de forma más robusta
             String responseBody = response.body();
-            int textStart = responseBody.indexOf("\"text\":\"") + 8;
-            int textEnd   = responseBody.indexOf("\"", textStart);
-            String description = responseBody.substring(textStart, textEnd)
-                    .replace("\\n", " ")
-                    .replace("\\\"", "\"")
-                    .trim();
+            String description  = extractText(responseBody);
+
+            if (description == null || description.isBlank()) {
+                return ResponseEntity.status(500).body(Map.of("message", "No se pudo extraer la descripción."));
+            }
 
             return ResponseEntity.ok(Map.of("description", description));
 
         } catch (Exception e) {
+            System.err.println("Error en AIController: " + e.getMessage());
             return ResponseEntity.status(500).body(Map.of("message", "Error interno: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Extrae el campo "text" del response de Anthropic sin librerías externas.
+     * El response tiene la forma: "content":[{"type":"text","text":"..."}]
+     */
+    private String extractText(String json) {
+        try {
+            // Buscar "type":"text" y luego el "text" que le sigue
+            String marker = "\"type\":\"text\"";
+            int typeIdx = json.indexOf(marker);
+            if (typeIdx == -1) return null;
+
+            // Buscar "text": después del marker
+            String textKey = "\"text\":\"";
+            int textIdx = json.indexOf(textKey, typeIdx);
+            if (textIdx == -1) return null;
+
+            int start = textIdx + textKey.length();
+
+            // Recorrer hasta encontrar la comilla de cierre (sin escapar)
+            StringBuilder sb = new StringBuilder();
+            int i = start;
+            while (i < json.length()) {
+                char c = json.charAt(i);
+                if (c == '\\' && i + 1 < json.length()) {
+                    char next = json.charAt(i + 1);
+                    switch (next) {
+                        case '"'  -> sb.append('"');
+                        case '\\'  -> sb.append('\\');
+                        case 'n'  -> sb.append(' ');
+                        case 'r'  -> {}
+                        case 't'  -> sb.append(' ');
+                        default   -> sb.append(next);
+                    }
+                    i += 2;
+                } else if (c == '"') {
+                    break; // fin del texto
+                } else {
+                    sb.append(c);
+                    i++;
+                }
+            }
+            return sb.toString().trim();
+        } catch (Exception e) {
+            return null;
         }
     }
 }
