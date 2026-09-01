@@ -16,6 +16,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.beans.factory.annotation.Value;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +28,12 @@ public class AuthService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final CompanyService companyService;
+
+    @Value("${admin.email:}")
+    private String adminEmail;
+
+    @Value("${admin.password:}")
+    private String adminPassword;
 
     public String register(RegisterRequest request) {
         String normalizedEmail = normalizeEmail(request.email);
@@ -127,16 +137,18 @@ public class AuthService {
 
     // ─── Login de administrador (sin cuenta en BD) ────────────────────────────
     public AuthResponse adminLogin(LoginRequest request) {
-        String adminEmail    = System.getenv("ADMIN_EMAIL");
-        String adminPassword = System.getenv("ADMIN_PASSWORD");
-
-        if (adminEmail == null || adminPassword == null) {
+        if (adminEmail.isBlank() || adminPassword.isBlank()) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "Credenciales de admin no configuradas.");
         }
 
-        if (!normalizeEmail(request.email).equals(normalizeEmail(adminEmail))
-                || !request.password.equals(adminPassword)) {
+        boolean emailMatches = MessageDigest.isEqual(
+                normalizeEmail(request.email).getBytes(StandardCharsets.UTF_8),
+                normalizeEmail(adminEmail).getBytes(StandardCharsets.UTF_8));
+        boolean passwordMatches = MessageDigest.isEqual(
+                request.password.getBytes(StandardCharsets.UTF_8),
+                adminPassword.getBytes(StandardCharsets.UTF_8));
+        if (!emailMatches || !passwordMatches) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales incorrectas.");
         }
 

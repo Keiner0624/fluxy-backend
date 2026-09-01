@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.text.Normalizer;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -33,7 +35,7 @@ public class CompanyService {
     private String generateUniqueSlug(String baseSlug) {
         String candidate = baseSlug;
         int suffix = 2;
-        while (companyRespository.findBySlug(candidate).isPresent()) {
+        while (companyRespository.existsBySlug(candidate)) {
             candidate = baseSlug + "-" + suffix;
             suffix++;
         }
@@ -41,15 +43,15 @@ public class CompanyService {
     }
 
     private String generateSlug(String name) {
-        return name.toLowerCase()
-                .replaceAll("[áàäâ]", "a")
-                .replaceAll("[éèëê]", "e")
-                .replaceAll("[íìïî]", "i")
-                .replaceAll("[óòöô]", "o")
-                .replaceAll("[úùüû]", "u")
-                .replaceAll("[^a-z0-9\\s]", "")
-                .replaceAll("\\s+", "-")
-                .trim();
+        if (name == null || name.isBlank()) {
+            return "store";
+        }
+        String slug = Normalizer.normalize(name, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("^-+|-+$", "");
+        return slug.isBlank() ? "store" : slug;
     }
     public Company updateConfig(Long companyId, Company updates) {
         Company company = companyRespository.findById(companyId)

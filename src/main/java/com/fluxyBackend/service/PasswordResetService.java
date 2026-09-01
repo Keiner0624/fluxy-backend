@@ -17,8 +17,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.HtmlUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
 import java.util.UUID;
 
 @Service
@@ -50,7 +55,7 @@ public class PasswordResetService {
 
             //Crear token nuevo
             String token = UUID.randomUUID().toString();
-            PasswordResetToken resetToken = PasswordResetToken.builder().token(token).user(user).
+            PasswordResetToken resetToken = PasswordResetToken.builder().token(hashToken(token)).user(user).
                     expiresAt(LocalDateTime.now().plusHours(1)) // expira en una hora
                     .used(false).build();
             tokenRepository.save(resetToken);
@@ -61,7 +66,7 @@ public class PasswordResetService {
 
     //Verificar token
     public boolean validateToken(String token) {
-        return tokenRepository.findByToken(token)
+        return tokenRepository.findByToken(hashToken(token))
                 .map(t -> !t.isExpired() && !t.isUsed())
                 .orElse(false);
     }
@@ -69,13 +74,13 @@ public class PasswordResetService {
     //Resetear Contraseña
     @Transactional
     public boolean resetPassword(String token, String newPassword) {
-        PasswordResetToken resetToken = tokenRepository.findByToken(token).
+        PasswordResetToken resetToken = tokenRepository.findByToken(hashToken(token)).
                 orElseThrow(() -> new RuntimeException("Token invalido o expirado"));
         if (resetToken.isExpired() || resetToken.isUsed()){
             throw new RuntimeException("El link ha expirado. Solicita uno nuevo.");
         }
-        if (newPassword == null || newPassword.length() < 6){
-            throw new RuntimeException("La contraseña debe tener al menos 6 caracteres.");
+        if (newPassword == null || newPassword.length() < 8){
+            throw new RuntimeException("La contraseña debe tener al menos 8 caracteres.");
         }
 
         User user = resetToken.getUser();
@@ -85,13 +90,13 @@ public class PasswordResetService {
         resetToken.setUsed(true);
         tokenRepository.save(resetToken);
 
-        log.info("Contraseña restablecida para el usuario: " + user.getEmail());
+        log.info("Contraseña restablecida para el usuario: {}", user.getEmail());
         return true;
     }
 
     private void sendResetEmail(User user, String token) {
         if (sendgridKey == null || sendgridKey.isBlank()) {
-            log.warn("SendGrid no configurado. Token de reset: {}", token);
+            log.warn("SendGrid no configurado; no se envió el correo de recuperación");
             return;
         }
         String resetLink = frontendUrl + "/reset-password?token=" + token;
@@ -139,7 +144,7 @@ public class PasswordResetService {
               </div>
             </body>
             </html>
-        """.formatted(user.getFullName(), resetLink);
+        """.formatted(HtmlUtils.htmlEscape(user.getFullName()), resetLink);
 
         try {
             Email from = new Email(mailFrom, "Fluxy");
@@ -154,9 +159,22 @@ public class PasswordResetService {
             req.setBody(mail.build());
             sg.api(req);
 
-            log.info("Email de restablecimiento enviado a: " + user.getEmail());
+            log.info("Email de restablecimiento enviado a: {}", user.getEmail());
         } catch (Exception e) {
             log.error("Error al enviar email de restablecimiento de contraseña: " + e.getMessage(), e);
+        }
+    }
+
+    private String hashToken(String token) {
+        if (token == null || token.isBlank()) {
+            return "";
+        }
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 no está disponible", e);
         }
     }
 }

@@ -7,7 +7,7 @@ import com.fluxyBackend.entity.Prodcut;
 import com.fluxyBackend.repository.CompanyRepository;
 import com.fluxyBackend.repository.ProductRepository;
 import com.fluxyBackend.service.OrderService;
-import com.fluxyBackend.service.WhatsAppService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,7 +23,6 @@ public class StoreController {
     private final ProductRepository productRepository;
     private final CompanyRepository companyRepository;
     private final OrderService orderService;
-    private final WhatsAppService whatsAppService;
 
     // ─── Catálogo público de productos ───────────────────────────────────────
     @GetMapping("/{companyId}/products")
@@ -36,7 +35,7 @@ public class StoreController {
     // ─── Crear orden como cliente (por ID) ───────────────────────────────────
     @PostMapping("/{companyId}/order")
     public Map<String, Object> createOrder(@PathVariable Long companyId,
-                                           @RequestBody CreateOrderRequest request) {
+                                           @Valid @RequestBody CreateOrderRequest request) {
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
 
@@ -80,7 +79,7 @@ public class StoreController {
     // ─── Crear orden por slug ─────────────────────────────────────────────────
     @PostMapping("/slug/{slug}/order")
     public Map<String, Object> createOrderBySlug(@PathVariable String slug,
-                                                 @RequestBody CreateOrderRequest request) {
+                                                 @Valid @RequestBody CreateOrderRequest request) {
         Company company = companyRepository.findBySlug(slug)
                 .orElseThrow(() -> new RuntimeException("Tienda no encontrada"));
 

@@ -42,8 +42,9 @@ public class PasswordResetController {
         if (token == null || token.isBlank()){
             return ResponseEntity.badRequest().body(Map.of("message", "El token es requerido"));
         }
-        if (newPassword == null || newPassword.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "La contraseña es requerida"));
+        if (newPassword == null || newPassword.length() < 8 || newPassword.length() > 72) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "La contraseña debe tener entre 8 y 72 caracteres"));
         }
         try {
             passwordResetService.resetPassword(token, newPassword);

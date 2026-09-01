@@ -6,6 +6,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -28,26 +30,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final CustomUserDetailsService userDetailsService;
 
+    @Value("${admin.email:}")
+    private String adminEmail;
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
-        if (path.startsWith("/auth/")) return true;
-        if (path.startsWith("/store/")) return true;
-        if (path.startsWith("/me")) return true;
-        if (path.equals("/companies") || path.equals("/companies/")) return true;
-        return false;
+        return path.startsWith("/auth/")
+                || path.startsWith("/store/")
+                || path.equals("/payments/webhook")
+                || path.equals("/coupons/validate")
+                || path.equals("/error");
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-
-        String path = request.getRequestURI();
-        if (path.startsWith("/auth/")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
 
         final String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -67,8 +66,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
                 // ─── Token de admin (sin cuenta en BD) ───────────────────────
-                String adminEmail = System.getenv("ADMIN_EMAIL");
-                if (adminEmail != null && userEmail.equalsIgnoreCase(adminEmail.trim())
+                if (!adminEmail.isBlank() && userEmail.equalsIgnoreCase(adminEmail.trim())
                         && jwtService.isAdminToken(jwt)) {
 
                     UsernamePasswordAuthenticationToken authToken =
@@ -93,7 +91,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     }
                 }
             }
-        } catch (JwtException | IllegalArgumentException ex) {
+        } catch (JwtException | IllegalArgumentException | AuthenticationException ex) {
             log.debug("Invalid JWT: {}", ex.getMessage());
         }
 

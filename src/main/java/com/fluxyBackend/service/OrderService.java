@@ -11,10 +11,10 @@ import com.fluxyBackend.response.OrderItemResponse;
 import com.fluxyBackend.response.OrderRespose;
 import com.fluxyBackend.response.ProductResponse;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
@@ -27,14 +27,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class OrderService {
 
-    private static final Logger log = LoggerFactory.getLogger(OrderService.class);
-
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
-    private final EmailService emailService;
     private final WhatsAppService whatsAppService;
     private final CouponRepository couponRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final List<String> PRO_PLANS = List.of("PRO", "BUSINESS");
 
@@ -43,6 +41,7 @@ public class OrderService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     }
 
+    @Transactional
     public Order createOrder(CreateOrderRequest request, String email) {
         User user = getUserByEmail(email);
 
@@ -57,7 +56,7 @@ public class OrderService {
         double total = 0.0;
 
         for (OrderItemsRequest itemsRequest : request.items) {
-            Prodcut prodcut = productRepository.findByIdAndCompany(
+            Prodcut prodcut = productRepository.findByIdAndCompanyForUpdate(
                             itemsRequest.productId, user.getCompany())
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.NOT_FOUND,
@@ -86,9 +85,14 @@ public class OrderService {
 
         order.setItems(orderItems);
         order.setTotal(total);
-        return orderRepository.save(order);
+        applyCoupon(request.couponCode, user.getCompany(), order, total);
+
+        Order savedOrder = orderRepository.save(order);
+        eventPublisher.publishEvent(new OrderCreatedEvent(savedOrder.getId(), user.getCompany().getId()));
+        return savedOrder;
     }
 
+    @Transactional
     public Order createOrderAsClient(CreateOrderRequest request, Company company) {
         Order order = new Order();
         order.setCustomerName(request.customerName);
@@ -102,7 +106,7 @@ public class OrderService {
         double total = 0.0;
 
         for (OrderItemsRequest itemsRequest : request.items) {
-            Prodcut prodcut = productRepository.findByIdAndCompany(
+            Prodcut prodcut = productRepository.findByIdAndCompanyForUpdate(
                             itemsRequest.productId, company)
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.NOT_FOUND, "Producto no encontrado"));
@@ -128,65 +132,51 @@ public class OrderService {
         order.setItems(orderItems);
         order.setTotal(total);
 
-        // ─── Aplicar cupón si viene en el request ────────────────────────────
-        if (request.couponCode != null && !request.couponCode.isBlank()) {
-            final double baseTotal = total;
-            couponRepository.findByCodeIgnoreCaseAndCompany(request.couponCode.toUpperCase(), company)
-                    .ifPresent(coupon -> {
-                        double discount = coupon.getDiscountType() == Coupon.DiscountType.PERCENTAGE
-                                ? baseTotal * (coupon.getDiscountValue() / 100)
-                                : Math.min(coupon.getDiscountValue(), baseTotal);
-                        double finalTotal = Math.max(baseTotal - discount, 0);
-                        order.setCouponCode(coupon.getCode());
-                        order.setDiscountAmount(discount);
-                        order.setTotal(finalTotal);
-                        coupon.setUsageCount(coupon.getUsageCount() + 1);
-                        couponRepository.save(coupon);
-                    });
-        }
+        applyCoupon(request.couponCode, company, order, total);
 
         Order savedOrder = orderRepository.save(order);
-
-        // ─── Notificaciones en background ────────────────────────────────────
-        new Thread(() -> {
-            try {
-                userRepository.findAll()
-                        .stream()
-                        .filter(u -> u.getCompany() != null &&
-                                u.getCompany().getId().equals(company.getId()))
-                        .findFirst()
-                        .ifPresent(owner -> {
-                            // ✅ Email (siempre)
-                            emailService.sendOrderNotification(
-                                    owner.getEmail(),
-                                    owner.getFullName(),
-                                    savedOrder
-                            );
-
-                            // ✅ WhatsApp (solo plan PRO o BUSINESS)
-                            String plan = company.getPlan() != null
-                                    ? company.getPlan().name() : "FREE";
-
-                            if (PRO_PLANS.contains(plan)) {
-                                String phone = company.getPhone();
-                                if (phone != null && !phone.isBlank()) {
-                                    whatsAppService.sendWhatsAppNotification(
-                                            phone, savedOrder, company
-                                    );
-                                    log.info("📱 WhatsApp enviado para pedido #{} — empresa {}",
-                                            savedOrder.getId(), company.getName());
-                                }
-                            } else {
-                                log.info("ℹ️ WhatsApp omitido para pedido #{} — plan FREE",
-                                        savedOrder.getId());
-                            }
-                        });
-            } catch (Exception e) {
-                log.error("Error en notificaciones pedido #{}: {}", savedOrder.getId(), e.getMessage());
-            }
-        }).start();
-
+        eventPublisher.publishEvent(new OrderCreatedEvent(savedOrder.getId(), company.getId()));
         return savedOrder;
+    }
+
+    private void applyCoupon(String couponCode, Company company, Order order, double baseTotal) {
+        if (couponCode == null || couponCode.isBlank()) {
+            return;
+        }
+
+        Coupon coupon = couponRepository
+                .findByCodeIgnoreCaseAndCompanyForUpdate(couponCode.trim(), company)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Cupón no encontrado"));
+
+        LocalDateTime now = LocalDateTime.now();
+        int usageCount = coupon.getUsageCount() == null ? 0 : coupon.getUsageCount();
+        Double discountValue = coupon.getDiscountValue();
+
+        if (!coupon.isActive()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El cupón no está activo");
+        }
+        if (coupon.getExpiresAt() != null && !coupon.getExpiresAt().isAfter(now)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El cupón ha vencido");
+        }
+        if (coupon.getUsageLimit() != null && usageCount >= coupon.getUsageLimit()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El cupón alcanzó su límite de usos");
+        }
+        if (coupon.getMinOrderAmount() != null && baseTotal < coupon.getMinOrderAmount()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El pedido no alcanza el monto mínimo");
+        }
+        if (discountValue == null || !Double.isFinite(discountValue) || discountValue <= 0
+                || (coupon.getDiscountType() == Coupon.DiscountType.PERCENTAGE && discountValue > 100)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El cupón tiene un descuento inválido");
+        }
+
+        double discount = coupon.getDiscountType() == Coupon.DiscountType.PERCENTAGE
+                ? baseTotal * (discountValue / 100)
+                : Math.min(discountValue, baseTotal);
+        order.setCouponCode(coupon.getCode());
+        order.setDiscountAmount(discount);
+        order.setTotal(Math.max(baseTotal - discount, 0));
+        coupon.setUsageCount(usageCount + 1);
     }
 
     // ─── Generar URL de WhatsApp para el cliente (retornar al frontend) ───────
@@ -212,6 +202,7 @@ public class OrderService {
                 .orElseThrow(() -> new RuntimeException("Pedido no encontrado"));
     }
 
+    @Transactional
     public Order cancelOrder(Long id, String email) {
         User user = getUserByEmail(email);
         Order order = orderRepository.findByIdAndCompany(id, user.getCompany())
@@ -219,6 +210,9 @@ public class OrderService {
 
         if (order.getStatus() == OrderStatus.CANCELLED) {
             throw new RuntimeException("El pedido ya ha sido cancelado.");
+        }
+        if (order.getStatus() == OrderStatus.COMPLETED) {
+            throw new RuntimeException("No puedes cancelar un pedido completado.");
         }
 
         for (OrderItem item : order.getItems()) {
@@ -237,6 +231,7 @@ public class OrderService {
                 .mapToDouble(Order::getTotal).sum();
     }
 
+    @Transactional
     public OrderRespose completeOrder(Long id, String email) {
         User user = getUserByEmail(email);
         Order order = orderRepository.findByIdAndCompany(id, user.getCompany())

@@ -1,5 +1,6 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.DTOs.CreateCouponRequest;
 import com.fluxyBackend.entity.Coupon;
 import com.fluxyBackend.entity.Coupon.DiscountType;
 import com.fluxyBackend.entity.Company;
@@ -8,17 +9,21 @@ import com.fluxyBackend.repository.CompanyRepository;
 import com.fluxyBackend.repository.CouponRepository;
 import com.fluxyBackend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.validation.annotation.Validated;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/coupons")
 @RequiredArgsConstructor
+@Validated
 public class CouponController {
 
     private final CouponRepository  couponRepository;
@@ -38,35 +43,32 @@ public class CouponController {
 
     // ─── Crear cupón ─────────────────────────────────────────────────────────
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody Map<String, Object> body, Authentication auth) {
+    public ResponseEntity<?> create(@Valid @RequestBody CreateCouponRequest request, Authentication auth) {
         User user = getUser(auth);
         Company company = user.getCompany();
 
-        String code = ((String) body.get("code")).toUpperCase().trim();
+        String code = request.code.trim().toUpperCase(Locale.ROOT);
 
         // Verificar que no exista ya
         if (couponRepository.findByCodeIgnoreCaseAndCompany(code, company).isPresent()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Ya existe un cupón con ese código."));
         }
 
-        String typeStr = (String) body.getOrDefault("discountType", "PERCENTAGE");
-        double value   = Double.parseDouble(body.get("discountValue").toString());
-
         // Validar porcentaje
-        if (typeStr.equals("PERCENTAGE") && (value <= 0 || value > 100)) {
+        if (request.discountType == DiscountType.PERCENTAGE && request.discountValue > 100) {
             return ResponseEntity.badRequest().body(Map.of("error", "El porcentaje debe ser entre 1 y 100."));
         }
 
         Coupon coupon = Coupon.builder()
                 .code(code)
-                .discountType(DiscountType.valueOf(typeStr))
-                .discountValue(value)
+                .discountType(request.discountType)
+                .discountValue(request.discountValue)
                 .company(company)
                 .active(true)
                 .usageCount(0)
-                .usageLimit(body.get("usageLimit") != null ? Integer.parseInt(body.get("usageLimit").toString()) : null)
-                .minOrderAmount(body.get("minOrderAmount") != null ? Double.parseDouble(body.get("minOrderAmount").toString()) : null)
-                .expiresAt(body.get("expiresAt") != null ? LocalDateTime.parse(body.get("expiresAt").toString()) : null)
+                .usageLimit(request.usageLimit)
+                .minOrderAmount(request.minOrderAmount)
+                .expiresAt(request.expiresAt)
                 .build();
 
         return ResponseEntity.ok(couponRepository.save(coupon));
@@ -103,6 +105,11 @@ public class CouponController {
             @RequestParam String code,
             @RequestParam Long companyId,
             @RequestParam Double orderTotal) {
+
+        if (orderTotal == null || !Double.isFinite(orderTotal) || orderTotal < 0) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "valid", false, "error", "El total del pedido es inválido."));
+        }
 
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));

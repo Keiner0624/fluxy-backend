@@ -4,6 +4,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import jakarta.validation.ConstraintViolationException;
 
 import java.util.Map;
 
@@ -19,5 +22,19 @@ public class GlobalExceptionHandler {
                 "plan", ex.getPlan(),
                 "upgradeRequired", true
         ));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
+        String message = ex.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .orElse("Solicitud inválida");
+        return ResponseEntity.badRequest().body(Map.of("message", message));
+    }
+
+    @ExceptionHandler({ConstraintViolationException.class, HttpMessageNotReadableException.class})
+    public ResponseEntity<Map<String, Object>> handleMalformedRequest(Exception ex) {
+        return ResponseEntity.badRequest().body(Map.of("message", "Solicitud inválida"));
     }
 }

@@ -9,7 +9,6 @@ import com.fluxyBackend.repository.OrderRepository;
 import com.fluxyBackend.repository.ProductRepository;
 import com.fluxyBackend.repository.UserRepository;
 import com.fluxyBackend.repository.PasswordResetTokenRepository;
-import com.fluxyBackend.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -32,7 +31,6 @@ public class AdminController {
     private final OrderRepository              orderRepository;
     private final ProductRepository            productRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
-    private final JwtService jwtService;
 
     private void requireAdmin(Authentication auth) {
         String email      = auth.getName();
@@ -62,7 +60,7 @@ public class AdminController {
         long free     = all.stream().filter(c -> c.getPlan() == null || c.getPlan() == Plan.FREE).count();
         long pro      = all.stream().filter(c -> c.getPlan() == Plan.PRO).count();
         long business = all.stream().filter(c -> c.getPlan() == Plan.BUSINESS).count();
-        double ingresos = (pro * 19.0) + (business * 39.0);
+        double ingresos = (pro * 39.0) + (business * 59.0);
         long pedidos = orderRepository.count();
 
         // Vendedores nuevos hoy
@@ -147,7 +145,7 @@ public class AdminController {
             if (activatedMonth.isBefore(sixMonthsAgo)) continue;
 
             String key = c.getPlanActivatedAt().toLocalDate().format(fmt);
-            double amount = c.getPlan() == Plan.PRO ? 19.0 : 39.0;
+            double amount = c.getPlan() == Plan.PRO ? 39.0 : 59.0;
             byMonth.merge(key, amount, Double::sum);
         }
 
@@ -203,8 +201,20 @@ public class AdminController {
                 .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
 
         String planStr = body.getOrDefault("plan", "FREE").toUpperCase();
-        int months = Integer.parseInt(body.getOrDefault("months", "1"));
-        Plan plan = Plan.valueOf(planStr);
+        int months;
+        Plan plan;
+        try {
+            months = Integer.parseInt(body.getOrDefault("months", "1"));
+            plan = Plan.valueOf(planStr);
+        } catch (IllegalArgumentException ex) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Plan o duración inválidos");
+        }
+        if (plan != Plan.FREE && (months < 1 || months > 12)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "La cantidad de meses debe estar entre 1 y 12");
+        }
 
         company.setPlan(plan);
         company.setPlanActivatedAt(LocalDateTime.now());

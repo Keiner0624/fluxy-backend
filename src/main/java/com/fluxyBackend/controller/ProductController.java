@@ -2,6 +2,7 @@ package com.fluxyBackend.controller;
 
 import com.fluxyBackend.entity.Prodcut;
 import com.fluxyBackend.service.ProductService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -15,7 +16,7 @@ public class ProductController {
     private final ProductService prodcutService;
 
     @PostMapping
-    public Prodcut create(@RequestBody Prodcut prodcut, Authentication authentication) {
+    public Prodcut create(@Valid @RequestBody Prodcut prodcut, Authentication authentication) {
         return prodcutService.createProduct(prodcut, authentication.getName());
     }
     @GetMapping
@@ -24,7 +25,7 @@ public class ProductController {
     }
 
     @PutMapping("/{id}")
-    public Prodcut update(@PathVariable Long id, @RequestBody Prodcut prodcut, Authentication authentication) {
+    public Prodcut update(@PathVariable Long id, @Valid @RequestBody Prodcut prodcut, Authentication authentication) {
         return prodcutService.update(id, prodcut, authentication.getName());
     }
 

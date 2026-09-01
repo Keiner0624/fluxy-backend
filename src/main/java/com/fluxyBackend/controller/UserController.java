@@ -21,7 +21,7 @@ public class UserController {
 
     // ── GET /me ─────────────────────────────────────────────────────────────
     @GetMapping
-    public Object me(Authentication authentication) {
+    public MeResponse me(Authentication authentication) {
         User user = findUser(authentication);
 
         Plan plan = (user.getCompany() != null && user.getCompany().getPlan() != null)
@@ -48,24 +48,18 @@ public class UserController {
             isBirthday = user.getBirthDate().getMonth()      == today.getMonth()
                     && user.getBirthDate().getDayOfMonth() == today.getDayOfMonth();
         }
-        final boolean birthdayFlag = isBirthday;
-
-        return new Object() {
-            public final String        fullName      = user.getFullName();
-            public final String        firstName_    = firstName;       // "firstName" en JSON
-            public final boolean       isBirthday    = birthdayFlag;
-            public final String        email         = user.getEmail();
-            public final String        companyName   = user.getCompany() != null ? user.getCompany().getName() : "";
-            public final Long          companyId     = user.getCompany() != null ? user.getCompany().getId()   : null;
-            public final String        planName      = plan.name();
-            public final int           planLimit     = productLimit;
-            public final LocalDateTime planExpiresAt = expiresAt;
-            public final boolean       trialUsed     = hasUsedTrial;
-
-            // Alias para que Jackson serialice como "firstName"
-            public String getFirstName()  { return firstName_; }
-            public boolean getIsBirthday(){ return isBirthday;  }
-        };
+        return new MeResponse(
+                user.getFullName(),
+                firstName,
+                isBirthday,
+                user.getEmail(),
+                user.getCompany() != null ? user.getCompany().getName() : "",
+                user.getCompany() != null ? user.getCompany().getId() : null,
+                plan.name(),
+                productLimit,
+                expiresAt,
+                hasUsedTrial
+        );
     }
 
     // ── PUT /me/profile ─────────────────────────────────────────────────────
@@ -115,4 +109,17 @@ public class UserController {
         return userRepository.findByEmailIgnoreCase(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
     }
+
+    public record MeResponse(
+            String fullName,
+            String firstName,
+            boolean isBirthday,
+            String email,
+            String companyName,
+            Long companyId,
+            String planName,
+            int planLimit,
+            LocalDateTime planExpiresAt,
+            boolean trialUsed
+    ) {}
 }

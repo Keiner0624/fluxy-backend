@@ -13,11 +13,17 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.net.IDN;
+import java.util.Locale;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/domains")
 @RequiredArgsConstructor
 public class DomainController {
+
+    private static final Pattern DOMAIN_PATTERN = Pattern.compile(
+            "^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$");
 
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
@@ -49,12 +55,23 @@ public class DomainController {
             return ResponseEntity.badRequest().body(Map.of("message", "El dominio es requerido."));
         }
 
-        // Limpiar dominio (quitar http/https/www)
-        domain = domain.trim()
-                .replaceAll("^https?://", "")
-                .replaceAll("^www\\.", "")
-                .replaceAll("/$", "")
-                .toLowerCase();
+        try {
+            domain = normalizeDomain(domain);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+
+        if (company.getCustomDomain() != null
+                && !company.getCustomDomain().equalsIgnoreCase(domain)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "message", "Elimina el dominio actual antes de registrar uno nuevo."));
+        }
+        if (companyRepository.findByCustomDomain(domain)
+                .filter(existing -> !existing.getId().equals(company.getId()))
+                .isPresent()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "message", "Ese dominio ya está asociado a otra tienda."));
+        }
 
         // Agregar a Vercel
         boolean success = vercelDomainService.addDomain(domain);
@@ -111,10 +128,33 @@ public class DomainController {
             return ResponseEntity.badRequest().body(Map.of("message", "No hay dominio configurado."));
         }
 
-        vercelDomainService.removeDomain(domain);
+        if (!vercelDomainService.removeDomain(domain)) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of(
+                    "message", "No se pudo eliminar el dominio en Vercel."));
+        }
         company.setCustomDomain(null);
         companyRepository.save(company);
 
         return ResponseEntity.ok(Map.of("message", "Dominio eliminado correctamente."));
+    }
+
+    private String normalizeDomain(String rawDomain) {
+        String value = rawDomain.trim().toLowerCase(Locale.ROOT)
+                .replaceFirst("^https?://", "")
+                .replaceFirst("^www\\.", "")
+                .replaceAll("[./]+$", "");
+        if (value.contains("/") || value.contains("?") || value.contains("#") || value.contains(":")) {
+            throw new IllegalArgumentException("El dominio no debe incluir ruta, puerto ni parámetros.");
+        }
+        String ascii;
+        try {
+            ascii = IDN.toASCII(value, IDN.USE_STD3_ASCII_RULES);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("El dominio no es válido.");
+        }
+        if (!DOMAIN_PATTERN.matcher(ascii).matches()) {
+            throw new IllegalArgumentException("El dominio no es válido.");
+        }
+        return ascii;
     }
 }

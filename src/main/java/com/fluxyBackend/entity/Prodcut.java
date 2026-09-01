@@ -3,6 +3,9 @@ package com.fluxyBackend.entity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 @Entity
@@ -17,8 +20,12 @@ public class Prodcut {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @NotBlank
+    @Size(max = 200)
     private String name;
+    @PositiveOrZero
     private double price;
+    @PositiveOrZero
     private int stock;
     private String imageUrl;
 

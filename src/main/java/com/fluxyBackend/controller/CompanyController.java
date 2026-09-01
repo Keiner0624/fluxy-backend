@@ -7,19 +7,19 @@ import com.fluxyBackend.repository.CompanyRepository;
 import com.fluxyBackend.repository.UserRepository;
 import com.fluxyBackend.service.CompanyService;
 import com.fluxyBackend.service.EmailService;
-import com.fluxyBackend.service.EmailService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/companies")
 @RequiredArgsConstructor
+@Slf4j
 public class CompanyController {
 
     private final CompanyService     companyService;
@@ -30,17 +30,7 @@ public class CompanyController {
     // ─── Crear empresa ───────────────────────────────────────────────────────
     @PostMapping
     public Company create(@RequestBody Company company) {
-        if (company.getSlug() == null || company.getSlug().isEmpty()) {
-            company.setSlug(generateSlug(company.getName()));
-        }
         return companyService.createCompany(company);
-    }
-
-    private String generateSlug(String name) {
-        return name.toLowerCase()
-                .replaceAll("[^a-z0-9\\s]", "")
-                .replaceAll("\\s+", "-")
-                .trim();
     }
 
     // ─── Listar empresas ─────────────────────────────────────────────────────
@@ -86,56 +76,6 @@ public class CompanyController {
         return user.getCompany();
     }
 
-    // ─── Actualizar plan ─────────────────────────────────────────────────────
-    @PutMapping("/plan")
-    public Company updatePlan(@RequestBody Map<String, String> body,
-                              Authentication authentication) {
-        User user = userRepository.findByEmailIgnoreCase(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
-        Company company = user.getCompany();
-
-        String planStr = body.get("plan");
-        if (planStr == null || planStr.isBlank())
-            throw new RuntimeException("El campo 'plan' es requerido.");
-
-        Plan plan;
-        try {
-            plan = Plan.valueOf(planStr.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Plan inválido: '" + planStr + "'.");
-        }
-
-        int months = 1;
-        if (body.containsKey("months")) {
-            try { months = Integer.parseInt(body.get("months")); }
-            catch (NumberFormatException e) { throw new RuntimeException("'months' debe ser un número."); }
-        }
-
-        LocalDateTime expiresAt = LocalDateTime.now().plusMonths(months);
-        company.setPlan(plan);
-        company.setPlanActivatedAt(LocalDateTime.now());
-        company.setPlanExpiresAt(expiresAt);
-        companyRepository.save(company);
-
-        // ✅ Enviar email de confirmación
-        if (plan != Plan.FREE) {
-            try {
-                emailService.sendPlanActivatedEmail(
-                        user.getEmail(),
-                        user.getFullName(),
-                        plan.name(),
-                        expiresAt
-                );
-            } catch (Exception e) {
-                // No crítico — el plan ya se activó
-                System.err.println("⚠️ No se pudo enviar email de confirmación: " + e.getMessage());
-            }
-        }
-
-        return company;
-    }
-
     // ─── Activar trial gratuito PRO por 1 mes ────────────────────────────────
     // POST /companies/trial
     @PostMapping("/trial")
@@ -173,7 +113,7 @@ public class CompanyController {
         try {
             emailService.sendTrialActivatedEmail(user.getEmail(), user.getFullName(), expiresAt);
         } catch (Exception e) {
-            System.err.println("Error enviando email de trial: " + e.getMessage());
+            log.error("Error enviando email de trial a {}", user.getEmail(), e);
         }
 
         return ResponseEntity.ok(Map.of(

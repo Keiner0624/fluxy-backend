@@ -9,11 +9,15 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 
 @Service
 public class VercelDomainService {
 
     private static final Logger log = LoggerFactory.getLogger(VercelDomainService.class);
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .build();
 
     @Value("${vercel.token:}")
     private String vercelToken;
@@ -39,15 +43,16 @@ public class VercelDomainService {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(10))
                     .header("Authorization", "Bearer " + vercelToken)
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
 
-            HttpResponse<String> response = HttpClient.newHttpClient()
+            HttpResponse<String> response = httpClient
                     .send(request, HttpResponse.BodyHandlers.ofString());
 
-            log.info("Vercel addDomain response [{}]: {}", response.statusCode(), response.body());
+            log.info("Vercel addDomain respondió con estado {}", response.statusCode());
             return response.statusCode() == 200 || response.statusCode() == 409; // 409 = ya existe
 
         } catch (Exception e) {
@@ -66,11 +71,12 @@ public class VercelDomainService {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(10))
                     .header("Authorization", "Bearer " + vercelToken)
                     .GET()
                     .build();
 
-            HttpResponse<String> response = HttpClient.newHttpClient()
+            HttpResponse<String> response = httpClient
                     .send(request, HttpResponse.BodyHandlers.ofString());
 
             String body = response.body();
@@ -94,11 +100,12 @@ public class VercelDomainService {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(10))
                     .header("Authorization", "Bearer " + vercelToken)
                     .DELETE()
                     .build();
 
-            HttpResponse<String> response = HttpClient.newHttpClient()
+            HttpResponse<String> response = httpClient
                     .send(request, HttpResponse.BodyHandlers.ofString());
 
             return response.statusCode() == 200;

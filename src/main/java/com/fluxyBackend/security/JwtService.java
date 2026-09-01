@@ -2,7 +2,6 @@ package com.fluxyBackend.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,18 +25,17 @@ public class JwtService {
                 .subject(email)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
-                .signWith(getSignInKey(), SignatureAlgorithm.HS256)
+                .signWith(getSignInKey())
                 .compact();
     }
-
-    // ─── Token especial para admin (sin cuenta en BD) ─────────────────────────
+    
     public String generateAdminToken(String email) {
         return Jwts.builder()
                 .subject(email)
                 .claims(Map.of("role", "ADMIN"))
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
-                .signWith(getSignInKey(), SignatureAlgorithm.HS256)
+                .signWith(getSignInKey())
                 .compact();
     }
 
@@ -56,7 +54,9 @@ public class JwtService {
 
     public boolean isTokenValid(String token, String email) {
         final String username = extractUsername(token);
-        return username.equals(email) && !isTokenExpired(token);
+        return username != null && email != null
+                && username.equalsIgnoreCase(email)
+                && !isTokenExpired(token);
     }
 
     private boolean isTokenExpired(String token) {

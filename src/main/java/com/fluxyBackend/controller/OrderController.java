@@ -7,7 +7,7 @@ import com.fluxyBackend.DTOs.TopProductResponse;
 import com.fluxyBackend.entity.Order;
 import com.fluxyBackend.response.OrderRespose;
 import com.fluxyBackend.service.OrderService;
-import com.fluxyBackend.service.PushNotificationService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -20,20 +20,10 @@ import java.util.List;
 public class OrderController {
 
     private final OrderService            orderService;
-    private final PushNotificationService pushService;   // ← agregado
 
     @PostMapping
-    public Order createOrder(@RequestBody CreateOrderRequest request, Authentication authentication) {
-        Order order = orderService.createOrder(request, authentication.getName());
-
-        // ── Notificar al vendedor en tiempo real ──────────────────────────
-        try {
-            pushService.notifyNewOrder(authentication.getName(), "#" + order.getId());
-        } catch (Exception e) {
-            // No bloquear la respuesta si el push falla
-        }
-
-        return order;
+    public Order createOrder(@Valid @RequestBody CreateOrderRequest request, Authentication authentication) {
+        return orderService.createOrder(request, authentication.getName());
     }
 
     @GetMapping

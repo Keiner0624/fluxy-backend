@@ -106,7 +106,7 @@ public class Company {
     public LocalDateTime getPlanExpiresAt() { return planExpiresAt; }
     public void setPlanExpiresAt(LocalDateTime planExpiresAt) { this.planExpiresAt = planExpiresAt; }
 
-    public Boolean isTrialUsed() { return trialUsed; }
+    public boolean isTrialUsed() { return Boolean.TRUE.equals(trialUsed); }
     public void setTrialUsed(Boolean trialUsed) { this.trialUsed = trialUsed; }
 
     // ─── Fecha de registro ───────────────────────────────────────────────────
