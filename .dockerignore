@@ -1,0 +1,15 @@
+target/
+.git/
+.gitignore
+.idea/
+.mvn/
+mvnw
+mvnw.cmd
+HELP.md
+README.md
+qodana.yaml
+.qodo/
+src/test/
+src/main/resources/application-local.properties
+.env
+.env.*

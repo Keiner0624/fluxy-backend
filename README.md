@@ -92,6 +92,44 @@ Para generar una clave JWT válida:
 La suite corre sobre **H2 en memoria** (modo PostgreSQL) con valores ficticios,
 así que no necesita la base local ni credenciales reales.
 
+## Despliegue en Render
+
+El repositorio trae `render.yaml` (blueprint) y `Dockerfile`. Render no tiene
+runtime nativo de Java, así que el servicio se construye con Docker.
+
+1. En Render: **New > Blueprint** y elegir este repositorio. Detecta
+   `render.yaml` y propone dos recursos: el servicio web `fluxy-backend` y la
+   base `fluxy-db`.
+2. Render pedirá las variables marcadas como secretas. Como mínimo:
+   - `JWT_SECRET` — Base64 de 32 bytes o más. Generar con:
+     ```powershell
+     [Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Max 256 }))
+     ```
+   - `MERCADOPAGO_ACCESS_TOKEN` y `MERCADOPAGO_WEBHOOK_SECRET` si se cobran planes.
+   - El resto puede quedar vacío hasta que se necesite.
+3. Tras el primer despliegue, Render asigna una URL del tipo
+   `https://fluxy-backend.onrender.com`. Copiarla en la variable
+   `APP_BACKEND_URL` del servicio y volver a desplegar. Mercado Pago la usa
+   para construir la URL de retorno y la del webhook.
+4. En **Vercel**, el frontend debe apuntar al backend nuevo: definir
+   `VITE_API_URL` con esa misma URL y redesplegar. Las variables `VITE_*` se
+   resuelven al compilar, así que un build viejo conserva el valor anterior.
+
+### Detalles a tener en cuenta
+
+- **La base arranca vacía.** Con `HIBERNATE_DDL_AUTO=update` el esquema se crea
+  solo, pero los datos locales no se migran. Para llevarlos:
+  ```bash
+  pg_dump -U postgres -h localhost fluxy_db > fluxy.sql
+  psql "<External Database URL de Render>" < fluxy.sql
+  ```
+- **El plan gratuito suspende el servicio** tras 15 minutos sin tráfico. La
+  primera petición después de dormir tarda cerca de 30 segundos, lo que en el
+  login se ve como una demora larga o un tiempo de espera agotado.
+- **CORS**: `APP_ALLOWED_ORIGINS` ya incluye los dominios de Vercel. Si se
+  agrega otro dominio, hay que sumarlo ahí o el navegador bloqueará las
+  peticiones.
+
 ## Estructura del proyecto
 
 ```

@@ -1,0 +1,75 @@
+# Blueprint de Render: servicio web + PostgreSQL administrado.
+# En el panel de Render: New > Blueprint, y apuntar a este repositorio.
+#
+# Las variables marcadas con "sync: false" no se guardan aquí: Render las
+# pide al crear el servicio. Son secretos y no deben vivir en el repositorio.
+
+databases:
+  - name: fluxy-db
+    databaseName: fluxy
+    user: fluxy
+    plan: free
+
+services:
+  - type: web
+    name: fluxy-backend
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+
+    envVars:
+      # ── Base de datos ──────────────────────────────────────────────────
+      # Render no permite componer cadenas, así que se pasan las piezas y
+      # application.properties arma la URL JDBC.
+      - key: DB_HOST
+        fromDatabase: { name: fluxy-db, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: fluxy-db, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: fluxy-db, property: database }
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase: { name: fluxy-db, property: user }
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase: { name: fluxy-db, property: password }
+      - key: HIBERNATE_DDL_AUTO
+        value: update
+
+      # ── URLs públicas ──────────────────────────────────────────────────
+      - key: APP_FRONTEND_URL
+        value: https://fluxyweb.vercel.app
+      - key: APP_ALLOWED_ORIGINS
+        value: https://fluxyweb.vercel.app,https://fluxyweb.com,https://www.fluxyweb.com
+      # Se completa tras el primer despliegue, cuando Render asigna la URL.
+      - key: APP_BACKEND_URL
+        sync: false
+
+      # ── Secretos ───────────────────────────────────────────────────────
+      # JWT_SECRET debe ser Base64 de 32 bytes o más.
+      - key: JWT_SECRET
+        sync: false
+      - key: MERCADOPAGO_ACCESS_TOKEN
+        sync: false
+      - key: MERCADOPAGO_WEBHOOK_SECRET
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: VERCEL_TOKEN
+        sync: false
+      - key: VERCEL_PROJECT_ID
+        sync: false
+      - key: VERCEL_TEAM_ID
+        sync: false
