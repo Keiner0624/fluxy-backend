@@ -63,7 +63,7 @@ en el repositorio: para valores locales usá `application-local.properties` o un
 | `SPRING_DATASOURCE_USERNAME` | `postgres` | Usuario de la base |
 | `SPRING_DATASOURCE_PASSWORD` | *(vacío)* | Contraseña de la base |
 | `HIBERNATE_DDL_AUTO` | `update` | Estrategia de esquema |
-| `JWT_SECRET` | *(clave de desarrollo)* | **Obligatoria en producción.** Base64 de 32 bytes o más |
+| `JWT_SECRET` | **sin valor** | **Obligatoria siempre.** Base64 de 32 bytes o más. Sin ella la aplicación no arranca |
 | `JWT_EXPIRATION_MS` | `86400000` | Vigencia del token (24 h) |
 | `APP_ALLOWED_ORIGINS` | `http://localhost:5173,…` | Orígenes permitidos por CORS |
 | `APP_FRONTEND_URL` | `http://localhost:5173` | URL del frontend |
@@ -76,6 +76,10 @@ en el repositorio: para valores locales usá `application-local.properties` o un
 | `VERCEL_TOKEN` / `VERCEL_PROJECT_ID` / `VERCEL_TEAM_ID` | *(vacío)* | Dominios personalizados |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | *(vacío)* | Credenciales del panel de administración |
 | `GEMINI_API_KEY` | *(vacío)* | Descripciones generadas con IA |
+
+`JWT_SECRET` no tiene valor por defecto a propósito. Una clave por defecto en
+el repositorio permite firmar tokens válidos de cualquier usuario sin conocer su
+contraseña. Si falta, la aplicación se niega a arrancar y explica cómo generarla.
 
 Para generar una clave JWT válida:
 
