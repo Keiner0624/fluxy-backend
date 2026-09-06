@@ -87,6 +87,16 @@ Para generar una clave JWT válida:
 [Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Max 256 }))
 ```
 
+## Salud del servicio
+
+```
+GET /actuator/health   →   {"status":"UP"}
+```
+
+Es público porque Render lo consulta para saber si la instancia está sana, en
+lugar de limitarse a comprobar que el puerto abre. No expone detalles internos
+(`show-details=never`) y el resto de `/actuator/**` queda cerrado.
+
 ## Pruebas
 
 ```powershell

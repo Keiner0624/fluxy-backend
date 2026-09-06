@@ -52,6 +52,9 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/store/**").permitAll()
+                        // Render lo consulta para saber si la instancia esta sana.
+                        // El resto de /actuator/** queda cerrado por anyRequest().
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/payments/webhook").permitAll()
                         .requestMatchers("/coupons/validate").permitAll()
                         .requestMatchers(HttpMethod.GET, "/companies", "/companies/").hasRole("ADMIN")

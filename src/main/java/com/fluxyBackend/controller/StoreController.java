@@ -49,7 +49,7 @@ public class StoreController {
         response.put("orderId", order.getId());
         response.put("total", order.getTotal());
 
-        // ✅ WhatsApp URL solo si el plan es PRO o BUSINESS
+        // WhatsApp URL solo si el plan es PRO o BUSINESS
         String whatsappUrl = orderService.generateWhatsAppUrl(order, company);
         if (whatsappUrl != null) {
             response.put("whatsappUrl", whatsappUrl);
@@ -93,7 +93,6 @@ public class StoreController {
         response.put("orderId", order.getId());
         response.put("total", order.getTotal());
 
-        // ✅ WhatsApp URL solo si el plan es PRO o BUSINESS
         String whatsappUrl = orderService.generateWhatsAppUrl(order, company);
         if (whatsappUrl != null) {
             response.put("whatsappUrl", whatsappUrl);

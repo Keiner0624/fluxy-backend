@@ -17,6 +17,7 @@ services:
     plan: free
     region: oregon
     dockerfilePath: ./Dockerfile
+    healthCheckPath: /actuator/health
     autoDeploy: true
 
     envVars:

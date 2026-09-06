@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.beans.factory.annotation.Value;
+import jakarta.annotation.PostConstruct;
+import java.util.UUID;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -28,6 +30,19 @@ public class AuthService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final CompanyService companyService;
+
+    /**
+     * Hash contra el que se compara cuando el correo no existe, para que el
+     * login tarde lo mismo en ambos casos. Se genera al arrancar con el mismo
+     * encoder, asi tiene el mismo coste que los hashes reales: uno fijo con
+     * otro coste volveria a delatar la diferencia.
+     */
+    private String hashSenuelo;
+
+    @PostConstruct
+    void prepararHashSenuelo() {
+        hashSenuelo = passwordEncoder.encode(UUID.randomUUID().toString());
+    }
 
     @Value("${admin.email:}")
     private String adminEmail;
@@ -53,11 +68,19 @@ public class AuthService {
     }
     public AuthResponse login(LoginRequest request){
         String normalizedEmail = normalizeEmail(request.email);
-        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales invalidas"));
-        if (!passwordEncoder.matches(request.password,user.getPassword())){
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail).orElse(null);
+
+        // Se compara siempre, exista el usuario o no. Antes, un correo
+        // inexistente respondia de inmediato y uno real tardaba lo que tarda
+        // bcrypt: esa diferencia de tiempo permitia averiguar que cuentas
+        // existen, aunque el mensaje de error fuera el mismo.
+        String hash = user != null ? user.getPassword() : hashSenuelo;
+        boolean passwordCorrecta = passwordEncoder.matches(request.password, hash);
+
+        if (user == null || !passwordCorrecta) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales invalidas");
         }
+
         String token = jwtService.generateToken(user.getEmail());
         return new AuthResponse(token);
     }

@@ -40,6 +40,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || path.startsWith("/store/")
                 || path.equals("/payments/webhook")
                 || path.equals("/coupons/validate")
+                || path.startsWith("/actuator/health")
                 || path.equals("/error");
     }
 
