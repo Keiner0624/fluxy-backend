@@ -3,6 +3,7 @@ package com.fluxyBackend.controller;
 import com.fluxyBackend.exception.NotFoundException;
 
 import com.fluxyBackend.DTOs.CreateOrderRequest;
+import com.fluxyBackend.DTOs.PublicStoreResponse;
 import com.fluxyBackend.entity.Company;
 import com.fluxyBackend.entity.Order;
 import com.fluxyBackend.entity.Prodcut;
@@ -59,16 +60,16 @@ public class StoreController {
 
     // ─── Info de empresa ──────────────────────────────────────────────────────
     @GetMapping("/{companyId}/info")
-    public Company getCompanyInfo(@PathVariable Long companyId) {
-        return companyRepository.findById(companyId)
-                .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
+    public PublicStoreResponse getCompanyInfo(@PathVariable Long companyId) {
+        return PublicStoreResponse.from(companyRepository.findById(companyId)
+                .orElseThrow(() -> new NotFoundException("Empresa no encontrada")));
     }
 
     // ─── Por slug ─────────────────────────────────────────────────────────────
     @GetMapping("/slug/{slug}/info")
-    public Company getBySlug(@PathVariable String slug) {
-        return companyRepository.findBySlug(slug)
-                .orElseThrow(() -> new NotFoundException("Tienda no encontrada"));
+    public PublicStoreResponse getBySlug(@PathVariable String slug) {
+        return PublicStoreResponse.from(companyRepository.findBySlug(slug)
+                .orElseThrow(() -> new NotFoundException("Tienda no encontrada")));
     }
 
     @GetMapping("/slug/{slug}/products")

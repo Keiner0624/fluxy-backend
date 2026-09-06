@@ -37,8 +37,11 @@ public class Prodcut {
     @JsonIgnore
     private User owner;
 
+    // No se serializa: iba incrustada en cada producto de la tienda publica,
+    // exponiendo el correo y los datos de facturacion del comerciante.
     @ManyToOne
     @JoinColumn(name = "company_id")
+    @JsonIgnore
     private Company company;
 
     @Column(columnDefinition = "TEXT")
