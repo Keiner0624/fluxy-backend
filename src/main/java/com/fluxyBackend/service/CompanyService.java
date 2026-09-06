@@ -1,5 +1,7 @@
 package com.fluxyBackend.service;
 
+import com.fluxyBackend.exception.NotFoundException;
+
 import com.fluxyBackend.entity.Company;
 import com.fluxyBackend.repository.CompanyRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +31,7 @@ public class CompanyService {
 
     public Company getById(Long id) {
         return companyRespository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+                .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
     }
 
     private String generateUniqueSlug(String baseSlug) {
@@ -55,7 +57,7 @@ public class CompanyService {
     }
     public Company updateConfig(Long companyId, Company updates) {
         Company company = companyRespository.findById(companyId)
-                .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+                .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
 
         if (updates.getName() != null && !updates.getName().isBlank()) {
             company.setName(updates.getName());

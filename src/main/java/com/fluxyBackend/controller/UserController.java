@@ -1,5 +1,7 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.exception.NotFoundException;
+
 import com.fluxyBackend.entity.Company.Plan;
 import com.fluxyBackend.entity.User;
 import com.fluxyBackend.repository.UserRepository;
@@ -107,7 +109,7 @@ public class UserController {
     // ── Helper ──────────────────────────────────────────────────────────────
     private User findUser(Authentication authentication) {
         return userRepository.findByEmailIgnoreCase(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
     }
 
     public record MeResponse(

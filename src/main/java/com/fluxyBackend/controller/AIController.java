@@ -1,5 +1,7 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.exception.NotFoundException;
+
 import com.fluxyBackend.entity.Company.Plan;
 import com.fluxyBackend.entity.User;
 import com.fluxyBackend.repository.UserRepository;
@@ -31,7 +33,7 @@ public class AIController {
             @RequestBody Map<String, String> body) {
 
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
 
         Plan plan = user.getCompany() != null && user.getCompany().getPlan() != null
                 ? user.getCompany().getPlan() : Plan.FREE;

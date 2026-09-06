@@ -1,5 +1,7 @@
 package com.fluxyBackend.service;
 
+import com.fluxyBackend.exception.NotFoundException;
+
 import com.fluxyBackend.DTOs.*;
 import com.fluxyBackend.entity.*;
 import com.fluxyBackend.repository.OrderRepository;
@@ -199,14 +201,14 @@ public class OrderService {
     public Order getOrderById(Long id, String email) {
         User user = getUserByEmail(email);
         return orderRepository.findByIdAndCompany(id, user.getCompany())
-                .orElseThrow(() -> new RuntimeException("Pedido no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Pedido no encontrado"));
     }
 
     @Transactional
     public Order cancelOrder(Long id, String email) {
         User user = getUserByEmail(email);
         Order order = orderRepository.findByIdAndCompany(id, user.getCompany())
-                .orElseThrow(() -> new RuntimeException("Pedido no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Pedido no encontrado"));
 
         if (order.getStatus() == OrderStatus.CANCELLED) {
             throw new RuntimeException("El pedido ya ha sido cancelado.");
@@ -235,7 +237,7 @@ public class OrderService {
     public OrderRespose completeOrder(Long id, String email) {
         User user = getUserByEmail(email);
         Order order = orderRepository.findByIdAndCompany(id, user.getCompany())
-                .orElseThrow(() -> new RuntimeException("Pedido no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Pedido no encontrado"));
 
         if (order.getStatus() == OrderStatus.COMPLETED)
             throw new RuntimeException("El pedido ya está completado.");

@@ -1,5 +1,7 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.exception.NotFoundException;
+
 import com.fluxyBackend.entity.Category;
 import com.fluxyBackend.entity.Company;
 import com.fluxyBackend.entity.User;
@@ -24,7 +26,7 @@ public class CategoryController {
 
     private User getUser(Authentication auth) {
         return userRepository.findByEmailIgnoreCase(auth.getName())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
     }
 
     // ─── Listar categorías del vendedor (privado) ─────────────────────────────
@@ -57,7 +59,7 @@ public class CategoryController {
         User user = getUser(auth);
         Category cat = categoryRepository.findById(id)
                 .filter(c -> c.getCompany().getId().equals(user.getCompany().getId()))
-                .orElseThrow(() -> new RuntimeException("Categoría no encontrada"));
+                .orElseThrow(() -> new NotFoundException("Categoría no encontrada"));
 
         if (body.containsKey("name") && !body.get("name").isBlank())
             cat.setName(body.get("name").trim());
@@ -73,7 +75,7 @@ public class CategoryController {
         User user = getUser(auth);
         Category cat = categoryRepository.findById(id)
                 .filter(c -> c.getCompany().getId().equals(user.getCompany().getId()))
-                .orElseThrow(() -> new RuntimeException("Categoría no encontrada"));
+                .orElseThrow(() -> new NotFoundException("Categoría no encontrada"));
 
         categoryRepository.delete(cat);
         return ResponseEntity.ok(Map.of("message", "Categoría eliminada."));
@@ -83,7 +85,7 @@ public class CategoryController {
     @GetMapping("/store/slug/{slug}/categories")
     public List<Category> publicBySlug(@PathVariable String slug) {
         Company company = companyRepository.findBySlug(slug)
-                .orElseThrow(() -> new RuntimeException("Tienda no encontrada"));
+                .orElseThrow(() -> new NotFoundException("Tienda no encontrada"));
         return categoryRepository.findByCompanyOrderByNameAsc(company);
     }
 
@@ -91,7 +93,7 @@ public class CategoryController {
     @GetMapping("/store/{companyId}/categories")
     public List<Category> publicById(@PathVariable Long companyId) {
         Company company = companyRepository.findById(companyId)
-                .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+                .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
         return categoryRepository.findByCompanyOrderByNameAsc(company);
     }
 }

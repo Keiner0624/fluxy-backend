@@ -1,5 +1,7 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.exception.NotFoundException;
+
 import com.fluxyBackend.entity.Company;
 import com.fluxyBackend.entity.Company.Plan;
 import com.fluxyBackend.entity.Role;
@@ -198,7 +200,7 @@ public class AdminController {
         requireAdmin(auth);
 
         Company company = companyRepository.findById(companyId)
-                .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+                .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
 
         String planStr = body.getOrDefault("plan", "FREE").toUpperCase();
         int months;
@@ -233,7 +235,7 @@ public class AdminController {
         requireAdmin(auth);
 
         Company company = companyRepository.findById(companyId)
-                .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+                .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
 
         List<User> users = userRepository.findByCompanyId(companyId);
         for (User user : users) {

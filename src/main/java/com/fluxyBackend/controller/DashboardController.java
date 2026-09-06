@@ -1,5 +1,7 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.exception.NotFoundException;
+
 import com.fluxyBackend.DTOs.SalesPerDayResponse;
 import com.fluxyBackend.DTOs.TopProductResponse;
 import com.fluxyBackend.entity.Order;
@@ -33,7 +35,7 @@ public class DashboardController {
         String email = authentication.getName();
 
         User user = userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
 
         List<Order> all = orderRepository.findByCompany(user.getCompany());
 

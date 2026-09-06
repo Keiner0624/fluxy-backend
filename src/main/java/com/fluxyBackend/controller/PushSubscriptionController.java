@@ -1,5 +1,7 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.exception.NotFoundException;
+
 import com.fluxyBackend.entity.PushSubscription;
 import com.fluxyBackend.entity.User;
 import com.fluxyBackend.repository.PushSubscriptionRepository;
@@ -25,7 +27,7 @@ public class PushSubscriptionController {
             @RequestBody Map<String, Object> body) {
 
         User user = userRepo.findByEmailIgnoreCase(auth.getName())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
 
         String endpoint = (String) body.get("endpoint");
 

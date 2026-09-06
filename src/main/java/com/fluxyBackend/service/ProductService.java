@@ -1,5 +1,7 @@
 package com.fluxyBackend.service;
 
+import com.fluxyBackend.exception.NotFoundException;
+
 import com.fluxyBackend.entity.Company;
 import com.fluxyBackend.entity.Prodcut;
 import com.fluxyBackend.entity.User;
@@ -23,7 +25,7 @@ public class ProductService {
 
     private User getUserByEmail(String email) {
         return userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
     }
 
     private static final Map<Company.Plan, Integer> PLAN_LIMITS = Map.of(
@@ -59,7 +61,7 @@ public class ProductService {
     public Prodcut update(Long id, Prodcut update, String email) {
         User user = getUserByEmail(email);
         Prodcut prodcut = prodcutRepository.findByIdAndCompany(id, user.getCompany())
-                .orElseThrow(() -> new RuntimeException("Prodcuts not found"));
+                .orElseThrow(() -> new NotFoundException("Prodcuts not found"));
 
         prodcut.setName(update.getName());
         prodcut.setPrice(update.getPrice());
@@ -81,7 +83,7 @@ public class ProductService {
     public void delete(Long id, String email) {
         User user = getUserByEmail(email);
         Prodcut prodcut = prodcutRepository.findByIdAndCompany(id, user.getCompany())
-                .orElseThrow(() -> new RuntimeException("Prodcuts not found"));
+                .orElseThrow(() -> new NotFoundException("Prodcuts not found"));
         prodcutRepository.delete(prodcut);
     }
 
@@ -97,6 +99,6 @@ public class ProductService {
             return;
         }
         product.setCategory(categoryRepository.findByIdAndCompany(requested.getId(), company)
-                .orElseThrow(() -> new RuntimeException("Categoría no encontrada")));
+                .orElseThrow(() -> new NotFoundException("Categoría no encontrada")));
     }
 }

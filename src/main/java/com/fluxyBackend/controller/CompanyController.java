@@ -1,5 +1,7 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.exception.NotFoundException;
+
 import com.fluxyBackend.entity.Company;
 import com.fluxyBackend.entity.Company.Plan;
 import com.fluxyBackend.entity.User;
@@ -43,7 +45,7 @@ public class CompanyController {
     @PutMapping("/config")
     public Company updateConfig(@RequestBody Company config, Authentication authentication) {
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
         Company company = user.getCompany();
 
         if (config.getName() != null && !config.getName().isBlank())
@@ -72,7 +74,7 @@ public class CompanyController {
     @GetMapping("/my-company")
     public Company myCompany(Authentication authentication) {
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
         return user.getCompany();
     }
 
@@ -81,7 +83,7 @@ public class CompanyController {
     @PostMapping("/trial")
     public ResponseEntity<Map<String, Object>> activateTrial(Authentication authentication) {
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
 
         Company company = user.getCompany();
 

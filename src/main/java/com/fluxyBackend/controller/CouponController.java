@@ -1,5 +1,7 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.exception.NotFoundException;
+
 import com.fluxyBackend.DTOs.CreateCouponRequest;
 import com.fluxyBackend.entity.Coupon;
 import com.fluxyBackend.entity.Coupon.DiscountType;
@@ -32,7 +34,7 @@ public class CouponController {
 
     private User getUser(Authentication auth) {
         return userRepository.findByEmailIgnoreCase(auth.getName())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
     }
 
     // ─── Listar cupones del vendedor ─────────────────────────────────────────
@@ -80,7 +82,7 @@ public class CouponController {
         User user = getUser(auth);
         Coupon coupon = couponRepository.findById(id)
                 .filter(c -> c.getCompany().getId().equals(user.getCompany().getId()))
-                .orElseThrow(() -> new RuntimeException("Cupón no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Cupón no encontrado"));
 
         coupon.setActive(!coupon.isActive());
         return ResponseEntity.ok(couponRepository.save(coupon));
@@ -92,7 +94,7 @@ public class CouponController {
         User user = getUser(auth);
         Coupon coupon = couponRepository.findById(id)
                 .filter(c -> c.getCompany().getId().equals(user.getCompany().getId()))
-                .orElseThrow(() -> new RuntimeException("Cupón no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Cupón no encontrado"));
 
         couponRepository.delete(coupon);
         return ResponseEntity.ok(Map.of("message", "Cupón eliminado."));
@@ -112,7 +114,7 @@ public class CouponController {
         }
 
         Company company = companyRepository.findById(companyId)
-                .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+                .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
 
         Coupon coupon = couponRepository.findByCodeIgnoreCaseAndCompany(code, company)
                 .orElse(null);

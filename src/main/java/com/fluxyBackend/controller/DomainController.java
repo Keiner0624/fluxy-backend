@@ -1,5 +1,7 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.exception.NotFoundException;
+
 import com.fluxyBackend.entity.Company;
 import com.fluxyBackend.entity.Company.Plan;
 import com.fluxyBackend.entity.User;
@@ -38,7 +40,7 @@ public class DomainController {
             Authentication authentication) {
 
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
 
         Company company = user.getCompany();
 
@@ -102,7 +104,7 @@ public class DomainController {
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> getDomainStatus(Authentication authentication) {
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
 
         Company company = user.getCompany();
         String domain = company.getCustomDomain();
@@ -119,7 +121,7 @@ public class DomainController {
     @DeleteMapping("/remove")
     public ResponseEntity<Map<String, Object>> removeDomain(Authentication authentication) {
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
 
         Company company = user.getCompany();
         String domain = company.getCustomDomain();
