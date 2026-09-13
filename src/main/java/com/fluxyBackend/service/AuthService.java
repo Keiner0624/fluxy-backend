@@ -31,6 +31,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final CompanyService companyService;
     private final BusinessRegistrationService businessRegistrationService;
+    private final com.fluxyBackend.repository.MembershipRepository membershipRepository;
 
     /**
      * Hash contra el que se compara cuando el correo no existe, para que el
@@ -80,6 +81,17 @@ public class AuthService {
 
         if (user == null || !passwordCorrecta) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales invalidas");
+        }
+
+        // Solo después de validar la contraseña: a un tercero no le revela nada.
+        if (user.getCompany() != null) {
+            membershipRepository.findByUserIdAndCompanyId(user.getId(), user.getCompany().getId())
+                    .filter(m -> !m.isActive())
+                    .ifPresent(m -> {
+                        throw new com.fluxyBackend.exception.ForbiddenException(
+                                com.fluxyBackend.exception.ForbiddenException.ACCESS_DISABLED,
+                                "Tu acceso a este negocio fue desactivado. Consultá con el dueño.");
+                    });
         }
 
         String token = jwtService.generateToken(user.getEmail());

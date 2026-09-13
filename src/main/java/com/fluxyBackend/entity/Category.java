@@ -18,8 +18,21 @@ public class Category {
 
     private String emoji; // ej: "🍕", "👕", "📱"
 
+    @Column(length = 300)
+    private String description;
+
+    /** Posición en la tienda; menor va primero. */
+    private Integer sortOrder;
+
+    /** Una categoría inactiva no se muestra en la tienda. Nullable por ddl-auto. */
+    private Boolean active;
+
     @ManyToOne
     @JoinColumn(name = "company_id")
     @JsonIgnore
     private Company company;
+
+    public Boolean getActive() {
+        return active == null || active;
+    }
 }

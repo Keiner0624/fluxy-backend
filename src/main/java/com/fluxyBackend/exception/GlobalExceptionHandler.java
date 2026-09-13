@@ -37,6 +37,30 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", ex.getMessage()));
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<Map<String, Object>> handleForbidden(ForbiddenException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("status", 403, "code", ex.getCode(), "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<Map<String, Object>> handleBusiness(BusinessException ex) {
+        return ResponseEntity.status(ex.getStatus())
+                .body(Map.of("status", ex.getStatus().value(), "code", ex.getCode(), "message", ex.getMessage()));
+    }
+
+    /**
+     * Sin esto Spring responde el ResponseStatusException sin el motivo, y el
+     * vendedor veía "Error" en vez de "Stock insuficiente: Pollo".
+     */
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatus(
+            org.springframework.web.server.ResponseStatusException ex) {
+        String reason = ex.getReason() == null ? "Solicitud rechazada" : ex.getReason();
+        return ResponseEntity.status(ex.getStatusCode())
+                .body(Map.of("status", ex.getStatusCode().value(), "message", reason));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex,
             jakarta.servlet.http.HttpServletRequest request) {

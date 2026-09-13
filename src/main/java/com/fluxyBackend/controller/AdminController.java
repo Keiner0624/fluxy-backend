@@ -41,6 +41,14 @@ public class AdminController {
     private final OrderRepository              orderRepository;
     private final ProductRepository            productRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final com.fluxyBackend.repository.OrderPaymentRepository orderPaymentRepository;
+    private final com.fluxyBackend.repository.OrderStatusChangeRepository statusChangeRepository;
+    private final com.fluxyBackend.repository.InventoryMovementRepository movementRepository;
+    private final com.fluxyBackend.repository.TeamInvitationRepository invitationRepository;
+    private final com.fluxyBackend.repository.MembershipRepository membershipRepository;
+    private final com.fluxyBackend.repository.CompanyIntegrationsRepository integrationsRepository;
+    private final com.fluxyBackend.repository.CustomerRepository customerRepository;
+    private final jakarta.persistence.EntityManager entityManager;
 
     private void requireAdmin(Authentication auth) {
         String email      = auth.getName();
@@ -190,8 +198,7 @@ public class AdminController {
                         Comparator.reverseOrder()
                 ))
                 .map(company -> {
-                    User owner = userRepository.findByCompanyId(company.getId())
-                            .stream().findFirst().orElse(null);
+                    User owner = userRepository.findFirstByCompanyIdAndRoleOrderByIdAsc(company.getId(), com.fluxyBackend.entity.Role.BUSINESS_OWNER).orElse(null);
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("companyId",     company.getId());
                     m.put("companyName",   company.getName()            != null ? company.getName()                    : "");
@@ -264,9 +271,27 @@ public class AdminController {
         for (User user : users) {
             passwordResetTokenRepository.deleteByUser_Email(user.getEmail());
         }
+        // Tablas sin clave foránea a la empresa: se borran explícitamente.
+        orderPaymentRepository.deleteByCompanyId(companyId);
+        statusChangeRepository.deleteByCompanyId(companyId);
+        movementRepository.deleteByCompanyId(companyId);
+        invitationRepository.deleteByCompanyId(companyId);
+        membershipRepository.deleteByCompanyId(companyId);
+        integrationsRepository.deleteById(companyId);
+
         orderRepository.deleteOrderItemsByCompanyId(companyId);
         orderRepository.deleteOrdersByCompanyId(companyId);
+        customerRepository.deleteByCompanyId(companyId);
         productRepository.deleteByCompanyId(companyId);
+        // Categorías, cupones y suscripciones push referencian a la empresa o a
+        // sus usuarios: sin borrarlas antes, eliminar la empresa fallaba.
+        entityManager.createQuery("DELETE FROM Category c WHERE c.company.id = :companyId")
+                .setParameter("companyId", companyId).executeUpdate();
+        entityManager.createQuery("DELETE FROM Coupon c WHERE c.company.id = :companyId")
+                .setParameter("companyId", companyId).executeUpdate();
+        entityManager.createQuery("DELETE FROM PushSubscription p WHERE p.user.id IN "
+                        + "(SELECT u.id FROM User u WHERE u.company.id = :companyId)")
+                .setParameter("companyId", companyId).executeUpdate();
         userRepository.deleteAll(users);
         companyRepository.delete(company);
 

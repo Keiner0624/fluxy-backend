@@ -1,5 +1,8 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.security.access.Permission;
+import com.fluxyBackend.security.access.RequirePermission;
+
 import com.fluxyBackend.DTOs.BusinessProfileRequest;
 import com.fluxyBackend.service.BusinessProfileService;
 import jakarta.validation.Valid;
@@ -19,6 +22,7 @@ public class BusinessProfileController {
     }
 
     @PutMapping
+    @RequirePermission(Permission.STORE_MANAGE)
     public BusinessProfileService.Details save(Authentication authentication,
             @RequestBody @Valid BusinessProfileRequest request) {
         return service.save(authentication.getName(), request);

@@ -22,6 +22,7 @@ public class Order {
     private String customerAddress;
     private Double total;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     // ─── Cupón aplicado ───────────────────────────────────────────────────────
     private String couponCode;
@@ -30,10 +31,22 @@ public class Order {
     @Enumerated(EnumType.STRING)
     private OrderStatus status;
 
+    /** Clave del medio de pago elegido al comprar (efectivo, yape, tarjeta...). */
+    @Column(length = 40)
+    private String paymentMethod;
+
+    @Column(length = 300)
+    private String cancelReason;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = true)
     @JsonIgnore
     private User owner;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id")
+    @JsonIgnore
+    private Customer customer;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items;
@@ -41,4 +54,16 @@ public class Order {
     @ManyToOne
     @JoinColumn(name = "company_id")
     private Company company;
+
+    /** Solo el id: serializar el cliente completo arrastraría sus notas internas. */
+    public Long getCustomerId() {
+        return customer == null ? null : customer.getId();
+    }
+
+    @PrePersist
+    @PreUpdate
+    void touch() {
+        if (createdAt == null) createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
 }

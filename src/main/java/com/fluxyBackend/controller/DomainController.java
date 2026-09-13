@@ -1,5 +1,8 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.security.access.Permission;
+import com.fluxyBackend.security.access.RequirePermission;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -48,6 +51,7 @@ public class DomainController {
                     content = @Content(mediaType = "application/json",
                             examples = @ExampleObject(value = "{\"domain\":\"mitienda.example.com\"}"))))
     @PostMapping("/add")
+    @RequirePermission(Permission.STORE_MANAGE)
     public ResponseEntity<Map<String, Object>> addDomain(
             @RequestBody Map<String, String> body,
             Authentication authentication) {
@@ -117,6 +121,7 @@ public class DomainController {
     @Operation(summary = "Consultar el estado del dominio",
             description = "Devuelve domain y status; status es none si no hay dominio configurado.")
     @GetMapping("/status")
+    @RequirePermission(Permission.STORE_MANAGE)
     public ResponseEntity<Map<String, Object>> getDomainStatus(Authentication authentication) {
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())
                 .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
@@ -136,6 +141,7 @@ public class DomainController {
     @Operation(summary = "Eliminar el dominio personalizado",
             description = "Desvincula el dominio de Vercel y de la empresa. Responde 400 si no hay dominio y 502 si falla la eliminación en Vercel.")
     @DeleteMapping("/remove")
+    @RequirePermission(Permission.STORE_MANAGE)
     public ResponseEntity<Map<String, Object>> removeDomain(Authentication authentication) {
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())
                 .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));

@@ -1,5 +1,8 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.security.access.Permission;
+import com.fluxyBackend.security.access.RequirePermission;
+
 import com.fluxyBackend.entity.Company.Plan;
 import com.fluxyBackend.entity.User;
 import com.fluxyBackend.repository.UserRepository;
@@ -112,6 +115,7 @@ public class MercadoPagoController {
             })
     @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/create-preference")
+    @RequirePermission(Permission.BILLING_MANAGE)
     public ResponseEntity<Map<String, String>> createPreference(
             @RequestBody Map<String, String> body,
             Authentication authentication) {

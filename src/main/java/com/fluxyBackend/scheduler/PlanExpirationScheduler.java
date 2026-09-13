@@ -42,8 +42,7 @@ public class PlanExpirationScheduler {
             log.info("Plan {} -> FREE para empresa {}", oldPlan, company.getName());
 
             //Enviar email de aviso al vendedor
-            userRepository.findByCompanyId(company.getId())
-                    .stream().findFirst().ifPresent(user -> {
+            userRepository.findFirstByCompanyIdAndRoleOrderByIdAsc(company.getId(), com.fluxyBackend.entity.Role.BUSINESS_OWNER).ifPresent(user -> {
                         try {
                             emailService.sendPlanExpiredEmail(user.getEmail(), user.getFullName(), oldPlan);
                         } catch (Exception e) {
@@ -70,8 +69,7 @@ public class PlanExpirationScheduler {
             int daysLeft = (int) java.time.Duration.between(now, expires).toDays();
 
             if (daysLeft <= 7) {
-                userRepository.findByCompanyId(company.getId())
-                        .stream().findFirst().ifPresent(user -> {
+                userRepository.findFirstByCompanyIdAndRoleOrderByIdAsc(company.getId(), com.fluxyBackend.entity.Role.BUSINESS_OWNER).ifPresent(user -> {
                             try {
                                 emailService.sendPlanExpiringEmail(user.getEmail(), user.getFullName(), company.getPlan().name(), daysLeft);
                                 log.info("Aviso de vencimiento enviado a {} - {} dias", user.getEmail(), daysLeft);

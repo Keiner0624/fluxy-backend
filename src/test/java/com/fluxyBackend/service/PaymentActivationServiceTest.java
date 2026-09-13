@@ -66,7 +66,7 @@ class PaymentActivationServiceTest {
 
         when(companyRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(company));
         when(processedPaymentRepository.markAsProcessed("123", 1L)).thenReturn(1);
-        when(userRepository.findFirstByCompanyId(1L)).thenReturn(Optional.empty());
+        when(userRepository.findFirstByCompanyIdAndRoleOrderByIdAsc(1L, com.fluxyBackend.entity.Role.BUSINESS_OWNER)).thenReturn(Optional.empty());
 
         Optional<PaymentActivationService.ActivationResult> result = service.activate(payment);
 

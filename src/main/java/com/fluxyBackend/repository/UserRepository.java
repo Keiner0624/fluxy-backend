@@ -1,5 +1,6 @@
 package com.fluxyBackend.repository;
 
+import com.fluxyBackend.entity.Role;
 import com.fluxyBackend.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -11,4 +12,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmailIgnoreCase(String email);
     List<User> findByCompanyId(Long companyId);
     Optional<User> findFirstByCompanyId(Long companyId);
+
+    /**
+     * Dueño de la empresa. Con el equipo, "el primer usuario de la empresa" ya
+     * puede ser un invitado, así que avisos y cobros tienen que buscar por rol.
+     */
+    Optional<User> findFirstByCompanyIdAndRoleOrderByIdAsc(Long companyId, Role role);
 }

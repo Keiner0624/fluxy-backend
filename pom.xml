@@ -9,7 +9,7 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.example</groupId>
-		<artifactId>demo</artifactId>
+		<artifactId>fluxy-api</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>fluxy-backend</name>
 	<description>Backend API for Fluxy</description>

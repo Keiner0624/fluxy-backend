@@ -6,12 +6,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import com.fluxyBackend.exception.NotFoundException;
 
 import com.fluxyBackend.DTOs.CreateOrderRequest;
+import com.fluxyBackend.DTOs.PublicProductResponse;
 import com.fluxyBackend.DTOs.PublicStoreResponse;
 import com.fluxyBackend.entity.Company;
 import com.fluxyBackend.entity.Order;
 import com.fluxyBackend.entity.Prodcut;
 import com.fluxyBackend.repository.CompanyRepository;
 import com.fluxyBackend.repository.ProductRepository;
+import com.fluxyBackend.service.IntegrationService;
 import com.fluxyBackend.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,15 +32,16 @@ public class StoreController {
     private final ProductRepository productRepository;
     private final CompanyRepository companyRepository;
     private final OrderService orderService;
+    private final IntegrationService integrationService;
 
     // ─── Catálogo público de productos ───────────────────────────────────────
     @Operation(summary = "Listar productos por empresa",
-            description = "Consulta el catálogo público por identificador de empresa.")
+            description = "Consulta el catálogo público por identificador de empresa. No incluye productos ocultos.")
     @GetMapping("/{companyId}/products")
-    public List<Prodcut> getProducts(@PathVariable Long companyId) {
+    public List<PublicProductResponse> getProducts(@PathVariable Long companyId) {
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
-        return productRepository.findByCompany(company);
+        return visibleProducts(company);
     }
 
     // ─── Crear orden como cliente (por ID) ───────────────────────────────────
@@ -49,21 +52,7 @@ public class StoreController {
                                            @Valid @RequestBody CreateOrderRequest request) {
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
-
-        Order order = orderService.createOrderAsClient(request, company);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("order", order);
-        response.put("orderId", order.getId());
-        response.put("total", order.getTotal());
-
-        // WhatsApp URL solo si el plan es PRO o BUSINESS
-        String whatsappUrl = orderService.generateWhatsAppUrl(order, company);
-        if (whatsappUrl != null) {
-            response.put("whatsappUrl", whatsappUrl);
-        }
-
-        return response;
+        return orderResponse(orderService.createOrderAsClient(request, company), company);
     }
 
     // ─── Info de empresa ──────────────────────────────────────────────────────
@@ -71,8 +60,9 @@ public class StoreController {
             description = "Devuelve los datos públicos de la tienda.")
     @GetMapping("/{companyId}/info")
     public PublicStoreResponse getCompanyInfo(@PathVariable Long companyId) {
-        return PublicStoreResponse.from(companyRepository.findById(companyId)
-                .orElseThrow(() -> new NotFoundException("Empresa no encontrada")));
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
+        return PublicStoreResponse.from(company, integrationService.settings(company.getId()));
     }
 
     // ─── Por slug ─────────────────────────────────────────────────────────────
@@ -80,17 +70,18 @@ public class StoreController {
             description = "Devuelve los datos públicos usando el slug de la tienda.")
     @GetMapping("/slug/{slug}/info")
     public PublicStoreResponse getBySlug(@PathVariable String slug) {
-        return PublicStoreResponse.from(companyRepository.findBySlug(slug)
-                .orElseThrow(() -> new NotFoundException("Tienda no encontrada")));
+        Company company = companyRepository.findBySlug(slug)
+                .orElseThrow(() -> new NotFoundException("Tienda no encontrada"));
+        return PublicStoreResponse.from(company, integrationService.settings(company.getId()));
     }
 
     @Operation(summary = "Listar productos por slug",
-            description = "Consulta el catálogo público usando el slug de la tienda.")
+            description = "Consulta el catálogo público usando el slug de la tienda. No incluye productos ocultos.")
     @GetMapping("/slug/{slug}/products")
-    public List<Prodcut> getProductsBySlug(@PathVariable String slug) {
+    public List<PublicProductResponse> getProductsBySlug(@PathVariable String slug) {
         Company company = companyRepository.findBySlug(slug)
                 .orElseThrow(() -> new NotFoundException("Tienda no encontrada"));
-        return productRepository.findByCompany(company);
+        return visibleProducts(company);
     }
 
     // ─── Crear orden por slug ─────────────────────────────────────────────────
@@ -101,19 +92,28 @@ public class StoreController {
                                                  @Valid @RequestBody CreateOrderRequest request) {
         Company company = companyRepository.findBySlug(slug)
                 .orElseThrow(() -> new NotFoundException("Tienda no encontrada"));
+        return orderResponse(orderService.createOrderAsClient(request, company), company);
+    }
 
-        Order order = orderService.createOrderAsClient(request, company);
+    private List<PublicProductResponse> visibleProducts(Company company) {
+        return productRepository.findVisibleByCompany(company, Prodcut.Status.HIDDEN).stream()
+                .map(PublicProductResponse::from)
+                .toList();
+    }
 
+    private Map<String, Object> orderResponse(Order order, Company company) {
         Map<String, Object> response = new HashMap<>();
-        response.put("order", order);
+        // Solo lo que el comprador necesita para su confirmación: la entidad
+        // completa arrastraba la empresa y el cliente vinculado.
+        response.put("order", Map.of("id", order.getId(), "total", order.getTotal(), "status", order.getStatus().name()));
         response.put("orderId", order.getId());
         response.put("total", order.getTotal());
 
+        // WhatsApp URL solo si el plan es PRO o BUSINESS
         String whatsappUrl = orderService.generateWhatsAppUrl(order, company);
         if (whatsappUrl != null) {
             response.put("whatsappUrl", whatsappUrl);
         }
-
         return response;
     }
 }

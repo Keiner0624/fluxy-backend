@@ -11,6 +11,9 @@ import com.fluxyBackend.exception.NotFoundException;
 import com.fluxyBackend.entity.Company.Plan;
 import com.fluxyBackend.entity.User;
 import com.fluxyBackend.repository.UserRepository;
+import com.fluxyBackend.security.access.AccessService;
+import com.fluxyBackend.security.access.Member;
+import com.fluxyBackend.security.access.Permission;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -28,6 +31,7 @@ import java.util.Map;
 public class UserController {
 
     private final UserRepository userRepository;
+    private final AccessService accessService;
 
     // ── GET /me ─────────────────────────────────────────────────────────────
     @Operation(summary = "Consultar mi perfil",
@@ -60,6 +64,14 @@ public class UserController {
             isBirthday = user.getBirthDate().getMonth()      == today.getMonth()
                     && user.getBirthDate().getDayOfMonth() == today.getDayOfMonth();
         }
+        // ── Rol y permisos en la empresa: el panel decide qué módulos mostrar ─
+        String role = null;
+        java.util.Set<String> permissions = java.util.Set.of();
+        if (user.getCompany() != null) {
+            Member member = accessService.current();
+            role = member.role().name();
+            permissions = Permission.names(member.permissions());
+        }
         return new MeResponse(
                 user.getFullName(),
                 firstName,
@@ -70,7 +82,9 @@ public class UserController {
                 plan.name(),
                 productLimit,
                 expiresAt,
-                hasUsedTrial
+                hasUsedTrial,
+                role,
+                permissions
         );
     }
 
@@ -137,6 +151,8 @@ public class UserController {
             String planName,
             int planLimit,
             LocalDateTime planExpiresAt,
-            boolean trialUsed
+            boolean trialUsed,
+            String role,
+            java.util.Set<String> permissions
     ) {}
 }

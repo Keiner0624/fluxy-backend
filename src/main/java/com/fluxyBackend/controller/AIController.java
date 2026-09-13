@@ -1,5 +1,8 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.security.access.Permission;
+import com.fluxyBackend.security.access.RequirePermission;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -41,6 +44,7 @@ public class AIController {
                     content = @Content(mediaType = "application/json",
                             examples = @ExampleObject(value = "{\"name\":\"Mochila urbana\",\"price\":\"89.90\",\"category\":\"Accesorios\"}"))))
     @PostMapping("/describe")
+    @RequirePermission(value = {Permission.PRODUCT_CREATE, Permission.PRODUCT_UPDATE}, any = true)
     public ResponseEntity<?> generateDescription(
             Authentication authentication,
             @RequestBody Map<String, String> body) {

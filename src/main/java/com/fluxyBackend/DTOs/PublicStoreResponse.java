@@ -1,6 +1,7 @@
 package com.fluxyBackend.DTOs;
 
 import com.fluxyBackend.entity.Company;
+import com.fluxyBackend.entity.CompanyIntegrations;
 
 public record PublicStoreResponse(
         Long id,
@@ -13,9 +14,17 @@ public record PublicStoreResponse(
         String logoUrl,
         String storeStyle,
         String paymentMethods,
-        Company.Plan plan
+        Company.Plan plan,
+        /* Integraciones que la tienda carga en el navegador del comprador. */
+        String googleAnalyticsId,
+        String metaPixelId,
+        boolean whatsappEnabled
 ) {
     public static PublicStoreResponse from(Company company) {
+        return from(company, null);
+    }
+
+    public static PublicStoreResponse from(Company company, CompanyIntegrations integrations) {
         return new PublicStoreResponse(
                 company.getId(),
                 company.getName(),
@@ -27,7 +36,10 @@ public record PublicStoreResponse(
                 company.getLogoUrl(),
                 company.getStoreStyle(),
                 company.getPaymentMethods(),
-                company.getPlan()
+                company.getPlan(),
+                integrations == null ? null : integrations.getGoogleAnalyticsId(),
+                integrations == null ? null : integrations.getMetaPixelId(),
+                integrations == null || integrations.isWhatsappEnabled()
         );
     }
 }

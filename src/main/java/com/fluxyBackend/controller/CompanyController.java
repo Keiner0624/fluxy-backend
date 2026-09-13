@@ -1,5 +1,8 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.security.access.Permission;
+import com.fluxyBackend.security.access.RequirePermission;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -55,6 +58,7 @@ public class CompanyController {
     @Operation(summary = "Actualizar la configuración de mi tienda",
             description = "Permite actualizar name, description, phone, address, email, logoUrl, storeStyle, primaryColor y paymentMethods.")
     @PutMapping("/config")
+    @RequirePermission(Permission.STORE_MANAGE)
     public Company updateConfig(@RequestBody Company config, Authentication authentication) {
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())
                 .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
@@ -97,6 +101,7 @@ public class CompanyController {
     @Operation(summary = "Activar la prueba gratuita de PRO",
             description = "Activa PRO por un mes una sola vez por empresa. Requiere plan FREE; responde 400 si ya existe un plan activo o se usó la prueba.")
     @PostMapping("/trial")
+    @RequirePermission(Permission.BILLING_MANAGE)
     public ResponseEntity<Map<String, Object>> activateTrial(Authentication authentication) {
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())
                 .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));

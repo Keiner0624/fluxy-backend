@@ -1,5 +1,8 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.security.access.Permission;
+import com.fluxyBackend.security.access.RequirePermission;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -47,6 +50,7 @@ public class CouponController {
             description = "Devuelve los cupones de la empresa del usuario.")
     @SecurityRequirement(name = "bearerAuth")
     @GetMapping
+    @RequirePermission(Permission.COUPON_VIEW)
     public List<Coupon> list(Authentication auth) {
         return couponRepository.findByCompany(getUser(auth).getCompany());
     }
@@ -56,6 +60,7 @@ public class CouponController {
             description = "El código debe ser único en la tienda. Los descuentos porcentuales no pueden superar 100.")
     @SecurityRequirement(name = "bearerAuth")
     @PostMapping
+    @RequirePermission(Permission.COUPON_MANAGE)
     public ResponseEntity<?> create(@Valid @RequestBody CreateCouponRequest request, Authentication auth) {
         User user = getUser(auth);
         Company company = user.getCompany();
@@ -92,6 +97,7 @@ public class CouponController {
             description = "Invierte el estado active de un cupón propio.")
     @SecurityRequirement(name = "bearerAuth")
     @PutMapping("/{id}/toggle")
+    @RequirePermission(Permission.COUPON_MANAGE)
     public ResponseEntity<?> toggle(@PathVariable Long id, Authentication auth) {
         User user = getUser(auth);
         Coupon coupon = couponRepository.findById(id)
@@ -107,6 +113,7 @@ public class CouponController {
             description = "Elimina un cupón de la empresa del usuario.")
     @SecurityRequirement(name = "bearerAuth")
     @DeleteMapping("/{id}")
+    @RequirePermission(Permission.COUPON_MANAGE)
     public ResponseEntity<?> delete(@PathVariable Long id, Authentication auth) {
         User user = getUser(auth);
         Coupon coupon = couponRepository.findById(id)

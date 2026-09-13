@@ -29,4 +29,9 @@ public class CreateOrderRequest {
     @Size(max = 50)
     @Schema(description = "Código de descuento opcional.", example = "PROMO10")
     public String couponCode;
+    @Size(max = 40)
+    @jakarta.validation.constraints.Pattern(regexp = "^[a-z0-9_-]*$",
+            message = "debe ser una clave de medio de pago, por ejemplo yape")
+    @Schema(description = "Medio de pago elegido por el cliente; opcional.", example = "yape")
+    public String paymentMethod;
 }

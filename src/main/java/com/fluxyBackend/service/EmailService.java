@@ -350,6 +350,45 @@ public class EmailService {
     }
 
 
+    // ─── Invitación al equipo ─────────────────────────────────────────────────
+    /** Devuelve false si el correo no está configurado: el panel ofrece copiar el enlace. */
+    public boolean sendTeamInvitationEmail(String toEmail, String companyName, String inviterName,
+                                           String roleLabel, String acceptUrl) {
+        if (sendgridKey == null || sendgridKey.isBlank()) {
+            log.warn("SendGrid no configurado. La invitación a {} se comparte con el enlace.", toEmail);
+            return false;
+        }
+        String html = """
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="UTF-8"></head>
+            <body style="margin:0; padding:0; background:#f7f9fc; font-family:'Segoe UI', Arial, sans-serif;">
+              <div style="max-width:520px; margin:40px auto; background:#ffffff; border:1px solid #e5eaf1; border-radius:14px; overflow:hidden;">
+                <div style="padding:28px 32px; border-bottom:1px solid #e5eaf1;">
+                  <div style="font-size:18px; font-weight:700; color:#0b172a;">Fluxy</div>
+                </div>
+                <div style="padding:28px 32px;">
+                  <p style="color:#0b172a; font-size:16px; font-weight:600; margin:0 0 12px;">Te invitaron a %s</p>
+                  <p style="color:#526078; font-size:14px; line-height:1.6; margin:0 0 22px;">
+                    %s te sumó al equipo con el rol <strong style="color:#0b172a;">%s</strong>.
+                    Creá tu contraseña para entrar al panel. El enlace vence en 7 días.
+                  </p>
+                  <a href="%s" style="display:inline-block; background:#1769e0; color:#ffffff; padding:12px 22px; border-radius:10px; font-weight:600; font-size:14px; text-decoration:none;">Aceptar invitación</a>
+                  <p style="color:#7d8ba1; font-size:12px; line-height:1.6; margin:22px 0 0;">Si no esperabas esta invitación, ignorá este correo.</p>
+                </div>
+              </div>
+            </body>
+            </html>
+        """.formatted(escape(companyName), escape(inviterName), escape(roleLabel), acceptUrl);
+        send(toEmail, toEmail, "Te invitaron al equipo de " + companyName + " en Fluxy", html);
+        return true;
+    }
+
+    private static String escape(String value) {
+        if (value == null) return "";
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+    }
+
     // ─── Email de trial activado ──────────────────────────────────────────────
     public void sendTrialActivatedEmail(String toEmail, String toName, java.time.LocalDateTime expiresAt) {
         String expiraStr = expiresAt.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));

@@ -1,0 +1,48 @@
+package com.fluxyBackend.security.access;
+
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/** Acciones que se pueden conceder a una persona del equipo, agrupadas por módulo. */
+public enum Permission {
+    PRODUCT_VIEW, PRODUCT_CREATE, PRODUCT_UPDATE, PRODUCT_DELETE,
+    ORDER_VIEW, ORDER_UPDATE, ORDER_CANCEL,
+    CUSTOMER_VIEW, CUSTOMER_UPDATE,
+    PAYMENT_VIEW, PAYMENT_UPDATE, PAYMENT_REFUND,
+    INVENTORY_VIEW, INVENTORY_ADJUST,
+    COUPON_VIEW, COUPON_MANAGE,
+    REPORT_VIEW, REPORT_EXPORT,
+    TEAM_VIEW, TEAM_INVITE, TEAM_MANAGE,
+    INTEGRATION_VIEW, INTEGRATION_MANAGE,
+    /** Configuración, estilo y dominio de la tienda. */
+    STORE_MANAGE,
+    /** Plan y facturación: solo el dueño. */
+    BILLING_MANAGE;
+
+    /** Permisos que nunca se conceden a alguien que no sea el dueño. */
+    public static final Set<Permission> OWNER_ONLY = EnumSet.of(BILLING_MANAGE);
+
+    /** Lee una lista separada por coma e ignora valores desconocidos. */
+    public static Set<Permission> parse(String csv) {
+        if (csv == null || csv.isBlank()) return EnumSet.noneOf(Permission.class);
+        Set<Permission> result = EnumSet.noneOf(Permission.class);
+        for (String part : csv.split(",")) {
+            String name = part.trim();
+            Arrays.stream(values()).filter(p -> p.name().equals(name)).findFirst().ifPresent(result::add);
+        }
+        return result;
+    }
+
+    public static String format(Set<Permission> permissions) {
+        return permissions.stream().sorted().map(Enum::name)
+                .collect(Collectors.joining(","));
+    }
+
+    public static Set<String> names(Set<Permission> permissions) {
+        return permissions.stream().sorted().map(Enum::name)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+}

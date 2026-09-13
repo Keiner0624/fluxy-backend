@@ -24,6 +24,7 @@ public class OrderNotificationListener {
     private final EmailService emailService;
     private final WhatsAppService whatsAppService;
     private final PushNotificationService pushNotificationService;
+    private final IntegrationService integrationService;
 
     @Async
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
@@ -32,7 +33,8 @@ public class OrderNotificationListener {
         try {
             Order order = orderRepository.findDetailedById(event.orderId())
                     .orElseThrow(() -> new IllegalStateException("Pedido no encontrado"));
-            User owner = userRepository.findFirstByCompanyId(event.companyId()).orElse(null);
+            User owner = userRepository.findFirstByCompanyIdAndRoleOrderByIdAsc(
+                    event.companyId(), com.fluxyBackend.entity.Role.BUSINESS_OWNER).orElse(null);
             if (owner == null) {
                 log.warn("No se encontró propietario para notificar el pedido #{}", event.orderId());
                 return;
@@ -45,6 +47,7 @@ public class OrderNotificationListener {
             if (company != null
                     && (company.getPlan() == Company.Plan.PRO
                     || company.getPlan() == Company.Plan.BUSINESS)
+                    && integrationService.whatsappEnabled(company.getId())
                     && company.getPhone() != null
                     && !company.getPhone().isBlank()) {
                 whatsAppService.sendWhatsAppNotification(company.getPhone(), order, company);

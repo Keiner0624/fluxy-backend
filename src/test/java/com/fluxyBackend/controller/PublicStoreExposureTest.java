@@ -82,4 +82,26 @@ class PublicStoreExposureTest {
                 .doesNotContain("trialUsed")
                 .doesNotContain("planExpiresAt");
     }
+
+    @Test
+    void elProductoDeLaTiendaNoExponeCostoNiDatosInternos() throws Exception {
+        com.fluxyBackend.entity.Prodcut producto = new com.fluxyBackend.entity.Prodcut();
+        producto.setId(5L);
+        producto.setName("Cafe");
+        producto.setPrice(12.0);
+        producto.setStock(5);
+        producto.setCost(7.35);
+        producto.setSku("CAF-001");
+        producto.setMinStock(9);
+        producto.setCompany(empresaCompleta());
+
+        String json = mapper.writeValueAsString(com.fluxyBackend.DTOs.PublicProductResponse.from(producto));
+
+        assertThat(json).contains("Cafe").contains("12.0");
+        assertThat(json)
+                .doesNotContain("7.35")
+                .doesNotContain("CAF-001")
+                .doesNotContain("minStock")
+                .doesNotContain("status");
+    }
 }

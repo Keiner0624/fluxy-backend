@@ -58,7 +58,8 @@ public class PaymentActivationService {
         company.setPlanActivatedAt(now);
         company.setPlanExpiresAt(expiresAt);
 
-        User owner = userRepository.findFirstByCompanyId(company.getId()).orElse(null);
+        User owner = userRepository.findFirstByCompanyIdAndRoleOrderByIdAsc(
+                company.getId(), com.fluxyBackend.entity.Role.BUSINESS_OWNER).orElse(null);
         return Optional.of(new ActivationResult(
                 company.getId(),
                 reference.plan(),
