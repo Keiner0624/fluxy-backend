@@ -70,7 +70,7 @@ public class ProductController {
     }
 
     @Operation(summary = "Actualizar un producto",
-            description = "Edición completa. Un cambio de stock queda registrado como ajuste de inventario.")
+            description = "Edición completa. Ignora stock: se cambia con movimientos de inventario.")
     @PutMapping("/{id}")
     @RequirePermission(Permission.PRODUCT_UPDATE)
     public Prodcut update(@PathVariable Long id, @Valid @RequestBody Prodcut prodcut) {

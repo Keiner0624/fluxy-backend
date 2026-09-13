@@ -6,7 +6,6 @@ import com.fluxyBackend.exception.NotFoundException;
 
 import com.fluxyBackend.entity.Category;
 import com.fluxyBackend.entity.Company;
-import com.fluxyBackend.entity.InventoryMovement;
 import com.fluxyBackend.entity.Prodcut;
 import com.fluxyBackend.entity.User;
 import com.fluxyBackend.exception.ProductLimitException;
@@ -89,13 +88,14 @@ public class ProductService {
     }
 
     /**
-     * Edición completa desde el formulario. Si cambia el stock queda un ajuste
-     * en el inventario: ningún cambio de stock pasa sin registro.
+     * Edición completa desde el formulario. El stock no se toca: el formulario
+     * pudo abrirse antes de una venta y guardaría un valor viejo, deshaciéndola.
+     * El stock cambia solo por pedidos o por movimientos en Inventario.
      */
     @Transactional
     public Prodcut update(Long id, Prodcut update, Member member) {
         Company company = member.company();
-        Prodcut prodcut = prodcutRepository.findByIdAndCompanyForUpdate(id, company)
+        Prodcut prodcut = prodcutRepository.findByIdAndCompany(id, company)
                 .orElseThrow(() -> new NotFoundException("Producto no encontrado"));
 
         prodcut.setName(update.getName());
@@ -111,12 +111,6 @@ public class ProductService {
         prodcut.setCost(update.getCost());
         if (update.getStatus() != null) prodcut.setStatus(update.getStatus());
         prodcut.setMinStock(update.getMinStock());
-
-        int delta = update.getStock() - prodcut.getStock();
-        if (delta != 0) {
-            inventoryService.apply(prodcut, InventoryMovement.Type.ADJUSTMENT, delta,
-                    "Stock editado en el producto", null, null, member.displayName());
-        }
         return prodcutRepository.save(prodcut);
     }
 

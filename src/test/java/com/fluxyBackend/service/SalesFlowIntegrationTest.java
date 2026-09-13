@@ -27,6 +27,7 @@ class SalesFlowIntegrationTest {
 
     @Autowired private OrderService orderService;
     @Autowired private OrderPaymentService paymentService;
+    @Autowired private ProductService productService;
     @Autowired private AccessService accessService;
     @Autowired private CompanyRepository companyRepository;
     @Autowired private UserRepository userRepository;
@@ -154,6 +155,21 @@ class SalesFlowIntegrationTest {
                 new OrderPaymentService.RefundRequest(10.0, "Producto dañado"));
         assertThat(refunded.status()).isEqualTo("REFUNDED");
         assertThat(refunded.netAmount()).isZero();
+    }
+
+    @Test
+    void editarElProductoNoPisaElStockQueMovioUnaVenta() {
+        // El formulario se abrió con stock 5; mientras tanto entró una venta de 2.
+        Prodcut formulario = Prodcut.builder().name("Pollo a la brasa").price(12.0).stock(5).build();
+        order("987654321", 2);
+
+        productService.update(product.getId(), formulario, owner);
+        entityManager.flush();
+        entityManager.clear();
+
+        Prodcut guardado = productRepository.findById(product.getId()).orElseThrow();
+        assertThat(guardado.getName()).isEqualTo("Pollo a la brasa");
+        assertThat(guardado.getStock()).isEqualTo(3);
     }
 
     @Test
