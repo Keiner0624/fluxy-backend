@@ -1,5 +1,11 @@
 package com.fluxyBackend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+
 import com.fluxyBackend.exception.NotFoundException;
 
 import com.fluxyBackend.entity.Company.Plan;
@@ -14,6 +20,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
 
+@Tag(name = "Perfil", description = "Datos personales y plan del usuario autenticado.")
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/me")
 @RequiredArgsConstructor
@@ -22,6 +30,8 @@ public class UserController {
     private final UserRepository userRepository;
 
     // ── GET /me ─────────────────────────────────────────────────────────────
+    @Operation(summary = "Consultar mi perfil",
+            description = "Incluye empresa, plan, límite de productos, vencimiento y uso de la prueba gratuita.")
     @GetMapping
     public MeResponse me(Authentication authentication) {
         User user = findUser(authentication);
@@ -66,6 +76,11 @@ public class UserController {
 
     // ── PUT /me/profile ─────────────────────────────────────────────────────
     // Body: { "firstName": "Juan", "lastName": "Pérez", "birthDate": "1995-08-20" }
+    @Operation(summary = "Actualizar mi perfil",
+            description = "Permite actualizar firstName, lastName y birthDate (YYYY-MM-DD).",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = "{\"firstName\":\"Ana\",\"lastName\":\"Pérez\",\"birthDate\":\"1995-08-20\"}"))))
     @PutMapping("/profile")
     public ResponseEntity<?> updateProfile(
             Authentication authentication,

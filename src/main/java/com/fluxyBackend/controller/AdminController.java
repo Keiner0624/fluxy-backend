@@ -1,5 +1,11 @@
 package com.fluxyBackend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+
 import com.fluxyBackend.exception.NotFoundException;
 
 import com.fluxyBackend.entity.Company;
@@ -23,6 +29,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Tag(name = "Administración", description = "Operaciones reservadas al administrador de Fluxy; requieren rol ADMIN.")
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/admin")
 @RequiredArgsConstructor
@@ -53,6 +61,8 @@ public class AdminController {
     }
 
     // ─── Métricas generales ───────────────────────────────────────────────────
+    @Operation(summary = "Consultar métricas generales",
+            description = "Devuelve vendedores por plan, pedidos y altas recientes. ingresosTotales es una estimación basada en los planes actuales.")
     @GetMapping("/metrics")
     public ResponseEntity<Map<String, Object>> getMetrics(Authentication auth) {
         requireAdmin(auth);
@@ -90,6 +100,8 @@ public class AdminController {
     }
 
     // ─── Vendedores por día (últimos 30 días) para gráfica ───────────────────
+    @Operation(summary = "Consultar altas diarias de vendedores",
+            description = "Devuelve date (dd/MM) y count de los últimos 30 días.")
     @GetMapping("/metrics/vendors-per-day")
     public ResponseEntity<List<Map<String, Object>>> getVendorsPerDay(Authentication auth) {
         requireAdmin(auth);
@@ -127,6 +139,8 @@ public class AdminController {
     }
 
     // ─── Ingresos por mes (últimos 6 meses) ──────────────────────────────────
+    @Operation(summary = "Consultar ingresos estimados por mes",
+            description = "Devuelve month y revenue de los últimos seis meses, estimados según el plan actual y su fecha de activación.")
     @GetMapping("/metrics/revenue-per-month")
     public ResponseEntity<List<Map<String, Object>>> getRevenuePerMonth(Authentication auth) {
         requireAdmin(auth);
@@ -164,6 +178,8 @@ public class AdminController {
     }
 
     // ─── Lista de vendedores ──────────────────────────────────────────────────
+    @Operation(summary = "Listar vendedores",
+            description = "Devuelve las empresas con datos de su propietario y plan, ordenadas desde la más reciente.")
     @GetMapping("/vendors")
     public ResponseEntity<List<Map<String, Object>>> getVendors(Authentication auth) {
         requireAdmin(auth);
@@ -192,6 +208,11 @@ public class AdminController {
     }
 
     // ─── Cambiar plan ─────────────────────────────────────────────────────────
+    @Operation(summary = "Cambiar el plan de un vendedor",
+            description = "Acepta FREE, PRO o BUSINESS. Por defecto usa FREE y un mes; PRO y BUSINESS admiten de 1 a 12 meses. FREE no tiene vencimiento.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = "{\"plan\":\"PRO\",\"months\":\"1\"}"))))
     @PutMapping("/vendors/{companyId}/plan")
     public ResponseEntity<Map<String, String>> changePlan(
             @PathVariable Long companyId,
@@ -227,6 +248,8 @@ public class AdminController {
     }
 
     // ─── Eliminar vendedor ────────────────────────────────────────────────────
+    @Operation(summary = "Eliminar un vendedor",
+            description = "Elimina la empresa, sus usuarios, productos, pedidos y tokens de recuperación.")
     @DeleteMapping("/vendors/{companyId}")
     @Transactional
     public ResponseEntity<Map<String, String>> deleteVendor(

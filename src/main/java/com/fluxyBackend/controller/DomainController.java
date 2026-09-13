@@ -1,5 +1,11 @@
 package com.fluxyBackend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+
 import com.fluxyBackend.exception.NotFoundException;
 
 import com.fluxyBackend.entity.Company;
@@ -19,6 +25,8 @@ import java.net.IDN;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
+@Tag(name = "Dominios", description = "Dominios personalizados de las tiendas.")
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/domains")
 @RequiredArgsConstructor
@@ -34,6 +42,11 @@ public class DomainController {
     // ─── Agregar dominio personalizado ───────────────────────────────────────
     // POST /domains/add
     // Body: { "domain": "mitienda.com" }
+    @Operation(summary = "Asociar un dominio personalizado",
+            description = "Requiere plan BUSINESS. Devuelve instrucciones DNS. Responde 409 si el dominio está en uso o debe eliminarse el dominio anterior.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = "{\"domain\":\"mitienda.example.com\"}"))))
     @PostMapping("/add")
     public ResponseEntity<Map<String, Object>> addDomain(
             @RequestBody Map<String, String> body,
@@ -101,6 +114,8 @@ public class DomainController {
     }
 
     // ─── Verificar estado del dominio ────────────────────────────────────────
+    @Operation(summary = "Consultar el estado del dominio",
+            description = "Devuelve domain y status; status es none si no hay dominio configurado.")
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> getDomainStatus(Authentication authentication) {
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())
@@ -118,6 +133,8 @@ public class DomainController {
     }
 
     // ─── Eliminar dominio personalizado ──────────────────────────────────────
+    @Operation(summary = "Eliminar el dominio personalizado",
+            description = "Desvincula el dominio de Vercel y de la empresa. Responde 400 si no hay dominio y 502 si falla la eliminación en Vercel.")
     @DeleteMapping("/remove")
     public ResponseEntity<Map<String, Object>> removeDomain(Authentication authentication) {
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())

@@ -1,5 +1,10 @@
 package com.fluxyBackend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+
 import com.fluxyBackend.exception.NotFoundException;
 
 import com.fluxyBackend.DTOs.SalesPerDayResponse;
@@ -20,6 +25,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Tag(name = "Dashboard", description = "Indicadores de la empresa del usuario autenticado.")
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/dashboard")
 @RequiredArgsConstructor
@@ -30,6 +37,8 @@ public class DashboardController {
     private final OrderRepository orderRepository;
     private final UserRepository  userRepository;
 
+    @Operation(summary = "Consultar los indicadores de mi tienda",
+            description = "Incluye productos, ventas completadas, pedidos por estado, ticket promedio, ventas de la semana, conversión y producto más vendido.")
     @GetMapping
     public Map<String, Object> dashboard(Authentication authentication) {
         String email = authentication.getName();
@@ -76,14 +85,19 @@ public class DashboardController {
         return data;
     }
 
+    @Operation(summary = "Consultar ventas diarias",
+            description = "Devuelve la serie diaria de ventas de la empresa.")
     @GetMapping("/sales-per-day")
     public List<SalesPerDayResponse> salesPerDay(Authentication authentication) {
         return orderService.getSalesPerDay(authentication.getName());
     }
 
+    @Operation(summary = "Consultar el ranking de productos",
+            description = "Permite seleccionar el período con el parámetro period.")
     @GetMapping("/top-products")
     public List<TopProductResponse> topProducts(
             Authentication authentication,
+            @Parameter(description = "today para el día actual; month (por defecto) o cualquier otro valor para el último mes.", example = "month")
             @RequestParam(defaultValue = "month") String period) {
         return orderService.getTopProducts(authentication.getName(), period);
     }

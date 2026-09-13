@@ -16,6 +16,7 @@ Este backend está desarrollado con **Java + Spring Boot** y expone una API REST
 - Mercado Pago SDK
 - SendGrid + Java Mail Sender
 - Web Push (VAPID)
+- OpenAPI 3 + Swagger UI (springdoc)
 
 ## Características principales
 
@@ -48,17 +49,96 @@ El esquema lo genera Hibernate al arrancar (`spring.jpa.hibernate.ddl-auto=updat
 
 La API queda en `http://localhost:8080`.
 
+## Documentación interactiva de la API
+
+Con el backend iniciado:
+
+| Recurso | URL local |
+| --- | --- |
+| Swagger UI | [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) |
+| OpenAPI JSON | [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs) |
+| OpenAPI YAML | [http://localhost:8080/v3/api-docs.yaml](http://localhost:8080/v3/api-docs.yaml) |
+
+La documentación se genera desde los controladores y DTOs e incluye descripciones
+en español, ejemplos de entrada y restricciones de validación. Los endpoints se
+agrupan por autenticación, perfil, empresas, productos, categorías, tienda pública,
+pedidos, cupones, dashboard, pagos, dominios, notificaciones y administración.
+La integración usa springdoc 3.0.x, compatible con Spring Boot 4.0.x según la
+[matriz oficial](https://springdoc.org/faq.html).
+
+### Probar endpoints con JWT
+
+1. Abrir **Autenticación > POST /auth/login**, pulsar **Try it out** y enviar
+   el correo y la contraseña de una cuenta existente.
+2. Copiar el valor `token` de la respuesta.
+3. Pulsar **Authorize**, pegar únicamente el JWT y confirmar. Swagger UI añade
+   automáticamente `Authorization: Bearer <token>`.
+4. Ejecutar los endpoints con candado. Para `/admin/**` y para crear o listar
+   todas las empresas, obtener el token en `POST /auth/admin-login`.
+
+Las rutas `/auth/**`, `/store/**` y `GET /coupons/validate` son públicas.
+`POST /payments/webhook` no usa JWT; los eventos de pago requieren la firma
+de Mercado Pago. La configuración de seguridad actual devuelve **403** si falta
+autenticación en una ruta privada; un login con credenciales inválidas devuelve
+**401**. Si se bloquean los intentos de login, devuelve **429** y `Retry-After`.
+
+### Ejemplo: crear una preferencia de pago
+
+`POST /payments/create-preference` requiere JWT y un usuario con empresa:
+
+```json
+{
+  "plan": "PRO",
+  "months": "3"
+}
+```
+
+`plan` admite `PRO` o `BUSINESS`; `months` se envía como texto con un entero
+de 1 a 12. Si se omiten, se usa `PRO` y `"1"`. Según `PlanPricingService`,
+PRO cuesta **S/ 39.00/mes**, BUSINESS **S/ 59.00/mes**, y la moneda es **PEN**.
+El ejemplo cobra **S/ 117.00**. La respuesta contiene `preferenceId`, `initPoint`
+y `sandboxUrl`. El plan se activa después de verificar el pago recibido por webhook.
+
+### Configuración y mantenimiento
+
+- Swagger y el contrato OpenAPI son públicos mientras están habilitados.
+  Definir `API_DOCS_ENABLED=false` y reiniciar deshabilita ambos.
+- Si se cambia `PORT`, usar ese puerto en las URLs. En un despliegue, sustituir
+  `http://localhost:8080` por la URL del backend.
+- Al añadir endpoints, usar `@Tag` y `@Operation`; documentar entradas con
+  `@Schema` y respuestas específicas con `@ApiResponse`.
+- Marcar operaciones privadas con `@SecurityRequirement(name = "bearerAuth")`.
+  En controladores con rutas públicas y privadas, anotar únicamente los métodos
+  privados para evitar heredar el requisito de JWT. Estas anotaciones describen
+  permisos; los permisos efectivos se configuran en `SecurityConfig`.
+- Conservar los nombres JSON existentes: por ejemplo, el registro de negocio
+  recibe `businesName` y `whatssapp` (también acepta el alias `whatsapp`).
+- En IntelliJ IDEA, recargar el proyecto Maven después de cambiar dependencias
+  para que el editor reconozca las anotaciones de Swagger.
+
 ### Variables de entorno
 
 Todos los valores de `application.properties` se leen del entorno con la forma
 `${VARIABLE:default}`. Los defaults sirven para desarrollo local; **en
 producción hay que definirlas explícitamente**. Nunca guardes secretos reales
-en el repositorio: para valores locales usá `application-local.properties` o un
-`.env`, ambos ignorados por git.
+en el repositorio. Para desarrollo local, la aplicación carga automáticamente
+el archivo `.env` desde la raíz del proyecto mediante
+[`spring.config.import`](https://docs.spring.io/spring-boot/reference/features/external-config.html).
+Este archivo está excluido de Git y Docker. Usa formato `NOMBRE=valor`, sin
+comillas ni `export`; las variables de entorno del proceso tienen prioridad.
+Si prefieres `src/main/resources/application-local.properties`, activa el perfil
+`local` con `SPRING_PROFILES_ACTIVE=local`.
+
+En IntelliJ, usa la raíz del proyecto como **Working directory**. Puedes guardar
+la clave en `.env` con `JWT_SECRET=tu_clave_base64`, o en **Run > Edit
+Configurations > Environment variables**, con **Nombre: JWT_SECRET** y
+**Valor: la clave generada**. Pegar la clave como nombre de variable no configura
+`JWT_SECRET`.
 
 | Variable | Default | Descripción |
 | --- | --- | --- |
 | `PORT` | `8080` | Puerto del servidor |
+| `API_DOCS_ENABLED` | `true` | Habilita Swagger UI y el contrato OpenAPI |
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/fluxy_db` | Conexión a PostgreSQL |
 | `SPRING_DATASOURCE_USERNAME` | `postgres` | Usuario de la base |
 | `SPRING_DATASOURCE_PASSWORD` | *(vacío)* | Contraseña de la base |

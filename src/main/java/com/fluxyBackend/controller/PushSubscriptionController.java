@@ -1,5 +1,11 @@
 package com.fluxyBackend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+
 import com.fluxyBackend.exception.NotFoundException;
 
 import com.fluxyBackend.entity.PushSubscription;
@@ -13,6 +19,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+@Tag(name = "Notificaciones", description = "Suscripciones Web Push del usuario autenticado.")
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/push")
 @RequiredArgsConstructor
@@ -21,6 +29,11 @@ public class PushSubscriptionController {
     private final PushSubscriptionRepository pushRepo;
     private final UserRepository             userRepo;
 
+    @Operation(summary = "Registrar una suscripción push",
+            description = "Requiere endpoint y keys con p256dh y auth. Repetir la suscripción para el mismo usuario no la duplica.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = "{\"endpoint\":\"https://push.example.com/subscription/123\",\"keys\":{\"p256dh\":\"clave-publica-del-navegador\",\"auth\":\"clave-de-autenticacion\"}}"))))
     @PostMapping("/subscribe")
     public ResponseEntity<?> subscribe(
             Authentication auth,

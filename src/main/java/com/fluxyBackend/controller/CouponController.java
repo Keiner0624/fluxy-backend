@@ -1,5 +1,9 @@
 package com.fluxyBackend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+
 import com.fluxyBackend.exception.NotFoundException;
 
 import com.fluxyBackend.DTOs.CreateCouponRequest;
@@ -22,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Locale;
 
+@Tag(name = "Cupones", description = "Gestión de descuentos y validación pública durante la compra.")
 @RestController
 @RequestMapping("/coupons")
 @RequiredArgsConstructor
@@ -38,12 +43,18 @@ public class CouponController {
     }
 
     // ─── Listar cupones del vendedor ─────────────────────────────────────────
+    @Operation(summary = "Listar mis cupones",
+            description = "Devuelve los cupones de la empresa del usuario.")
+    @SecurityRequirement(name = "bearerAuth")
     @GetMapping
     public List<Coupon> list(Authentication auth) {
         return couponRepository.findByCompany(getUser(auth).getCompany());
     }
 
     // ─── Crear cupón ─────────────────────────────────────────────────────────
+    @Operation(summary = "Crear un cupón",
+            description = "El código debe ser único en la tienda. Los descuentos porcentuales no pueden superar 100.")
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping
     public ResponseEntity<?> create(@Valid @RequestBody CreateCouponRequest request, Authentication auth) {
         User user = getUser(auth);
@@ -77,6 +88,9 @@ public class CouponController {
     }
 
     // ─── Activar / desactivar cupón ──────────────────────────────────────────
+    @Operation(summary = "Activar o desactivar un cupón",
+            description = "Invierte el estado active de un cupón propio.")
+    @SecurityRequirement(name = "bearerAuth")
     @PutMapping("/{id}/toggle")
     public ResponseEntity<?> toggle(@PathVariable Long id, Authentication auth) {
         User user = getUser(auth);
@@ -89,6 +103,9 @@ public class CouponController {
     }
 
     // ─── Eliminar cupón ───────────────────────────────────────────────────────
+    @Operation(summary = "Eliminar un cupón",
+            description = "Elimina un cupón de la empresa del usuario.")
+    @SecurityRequirement(name = "bearerAuth")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id, Authentication auth) {
         User user = getUser(auth);
@@ -102,6 +119,8 @@ public class CouponController {
 
     // ─── Validar cupón (público — lo llama el cliente al checkout) ───────────
     // GET /coupons/validate?code=PROMO10&companyId=1&orderTotal=50
+    @Operation(summary = "Validar un cupón",
+            description = "Calcula discount y finalTotal sin consumir el cupón. Responde 400 si no es aplicable y 404 si la empresa no existe.")
     @GetMapping("/validate")
     public ResponseEntity<?> validate(
             @RequestParam String code,

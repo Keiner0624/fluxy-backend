@@ -7,6 +7,15 @@ import com.fluxyBackend.service.EmailService;
 import com.fluxyBackend.service.PaymentActivationService;
 import com.fluxyBackend.service.PaymentActivationService.ActivationResult;
 import com.fluxyBackend.service.PlanPricingService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.media.SchemaProperty;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.mercadopago.MercadoPagoConfig;
 import com.mercadopago.client.payment.PaymentClient;
 import com.mercadopago.client.preference.PreferenceBackUrlsRequest;
@@ -38,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+@Tag(name = "Pagos", description = "Compra de planes y confirmación de pagos mediante Mercado Pago.")
 @RestController
 @RequestMapping("/payments")
 @RequiredArgsConstructor
@@ -66,6 +76,41 @@ public class MercadoPagoController {
         MercadoPagoConfig.setAccessToken(accessToken);
     }
 
+    @Operation(summary = "Crear una preferencia de pago",
+            description = "Crea el checkout para la empresa del usuario autenticado. "
+                    + "PRO cuesta S/ 39.00 por mes y BUSINESS S/ 59.00 por mes. "
+                    + "La moneda es PEN y el total es precio mensual por meses, sin descuentos. "
+                    + "Si se omiten los campos se usa PRO y un mes. Crear la preferencia no activa el plan; "
+                    + "la activación depende del webhook y de la verificación del pago.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(type = "object"),
+                            schemaProperties = {
+                                    @SchemaProperty(name = "plan", schema = @Schema(type = "string",
+                                            allowableValues = {"PRO", "BUSINESS"}, defaultValue = "PRO",
+                                            description = "Plan de pago; se normalizan espacios y mayúsculas.")),
+                                    @SchemaProperty(name = "months", schema = @Schema(type = "string",
+                                            defaultValue = "1", example = "3",
+                                            description = "Cantidad entera de meses, entre 1 y 12, enviada como texto."))
+                            },
+                            examples = @ExampleObject(value = "{\"plan\":\"PRO\",\"months\":\"3\"}"))),
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Preferencia creada",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(type = "object"),
+                                    schemaProperties = {
+                                            @SchemaProperty(name = "preferenceId", schema = @Schema(type = "string")),
+                                            @SchemaProperty(name = "initPoint", schema = @Schema(type = "string", format = "uri")),
+                                            @SchemaProperty(name = "sandboxUrl", schema = @Schema(type = "string", format = "uri"))
+                                    })),
+                    @ApiResponse(responseCode = "400", description = "Plan o duración inválidos", content = @Content),
+                    @ApiResponse(responseCode = "403", description = "Se requiere un JWT válido", content = @Content),
+                    @ApiResponse(responseCode = "502", description = "No se pudo iniciar el pago",
+                            content = @Content(mediaType = "application/json",
+                                    examples = @ExampleObject(value = "{\"error\":\"No se pudo iniciar el pago\"}")))
+            })
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/create-preference")
     public ResponseEntity<Map<String, String>> createPreference(
             @RequestBody Map<String, String> body,
@@ -118,13 +163,35 @@ public class MercadoPagoController {
         }
     }
 
+    @Operation(summary = "Recibir una notificación de Mercado Pago",
+            description = "No requiere JWT. Para eventos payment valida x-signature y x-request-id "
+                    + "con el secreto configurado y consulta el pago en Mercado Pago. "
+                    + "Los eventos de otros tipos se ignoran con 200. "
+                    + "El ID se obtiene de data.id en query, data.id del cuerpo o id en query, en ese orden. "
+                    + "La activación verifica el pago y evita procesar el mismo pago dos veces.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = "{\"type\":\"payment\",\"data\":{\"id\":\"123456789\"}}"))),
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Notificación procesada o ignorada", content = @Content),
+                    @ApiResponse(responseCode = "400", description = "Evento payment sin ID de pago", content = @Content),
+                    @ApiResponse(responseCode = "401", description = "Firma del webhook inválida", content = @Content),
+                    @ApiResponse(responseCode = "502", description = "Error al consultar el pago en Mercado Pago", content = @Content),
+                    @ApiResponse(responseCode = "503", description = "Secreto del webhook no configurado", content = @Content),
+                    @ApiResponse(responseCode = "500", description = "Error al procesar la notificación", content = @Content)
+            })
     @PostMapping("/webhook")
     public ResponseEntity<Void> webhook(
             @RequestBody(required = false) Map<String, Object> body,
+            @Parameter(description = "Tipo de evento; tiene prioridad sobre type del cuerpo.", example = "payment")
             @RequestParam(required = false) String type,
+            @Parameter(description = "ID alternativo de pago.", example = "123456789")
             @RequestParam(required = false) String id,
+            @Parameter(description = "ID de pago prioritario.", example = "123456789")
             @RequestParam(name = "data.id", required = false) String queryDataId,
+            @Parameter(description = "Firma de Mercado Pago; necesaria para validar eventos payment.")
             @RequestHeader(name = "x-signature", required = false) String signature,
+            @Parameter(description = "Identificador de solicitud usado para validar la firma de eventos payment.")
             @RequestHeader(name = "x-request-id", required = false) String requestId) {
 
         String topic = type != null ? type : bodyValue(body, "type");

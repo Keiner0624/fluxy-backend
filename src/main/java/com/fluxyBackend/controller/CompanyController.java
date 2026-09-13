@@ -1,5 +1,9 @@
 package com.fluxyBackend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+
 import com.fluxyBackend.exception.NotFoundException;
 
 import com.fluxyBackend.entity.Company;
@@ -18,6 +22,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@Tag(name = "Empresas", description = "Configuración de tiendas y prueba gratuita.")
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/companies")
 @RequiredArgsConstructor
@@ -30,18 +36,24 @@ public class CompanyController {
     private final EmailService       emailService;
 
     // ─── Crear empresa ───────────────────────────────────────────────────────
+    @Operation(summary = "Crear una empresa",
+            description = "Requiere rol ADMIN.")
     @PostMapping
     public Company create(@RequestBody Company company) {
         return companyService.createCompany(company);
     }
 
     // ─── Listar empresas ─────────────────────────────────────────────────────
+    @Operation(summary = "Listar todas las empresas",
+            description = "Requiere rol ADMIN.")
     @GetMapping
     public List<Company> list() {
         return companyService.getAllCompanies();
     }
 
     // ─── Actualizar configuración ────────────────────────────────────────────
+    @Operation(summary = "Actualizar la configuración de mi tienda",
+            description = "Permite actualizar name, description, phone, address, email, logoUrl, storeStyle, primaryColor y paymentMethods.")
     @PutMapping("/config")
     public Company updateConfig(@RequestBody Company config, Authentication authentication) {
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())
@@ -71,6 +83,8 @@ public class CompanyController {
     }
 
     // ─── Mi empresa ──────────────────────────────────────────────────────────
+    @Operation(summary = "Consultar mi empresa",
+            description = "Devuelve la empresa asociada al usuario autenticado.")
     @GetMapping("/my-company")
     public Company myCompany(Authentication authentication) {
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())
@@ -80,6 +94,8 @@ public class CompanyController {
 
     // ─── Activar trial gratuito PRO por 1 mes ────────────────────────────────
     // POST /companies/trial
+    @Operation(summary = "Activar la prueba gratuita de PRO",
+            description = "Activa PRO por un mes una sola vez por empresa. Requiere plan FREE; responde 400 si ya existe un plan activo o se usó la prueba.")
     @PostMapping("/trial")
     public ResponseEntity<Map<String, Object>> activateTrial(Authentication authentication) {
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())

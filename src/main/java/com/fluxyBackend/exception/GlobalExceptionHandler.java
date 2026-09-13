@@ -13,6 +13,14 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(RegistrationException.class)
+    public ResponseEntity<Map<String, Object>> handleRegistration(RegistrationException ex,
+            jakarta.servlet.http.HttpServletRequest request) {
+        return ResponseEntity.status(ex.getStatus()).body(Map.of(
+                "status", ex.getStatus().value(), "code", ex.getCode(), "field", ex.getField(),
+                "message", ex.getMessage(), "path", request.getRequestURI()));
+    }
+
     @ExceptionHandler(ProductLimitException.class)
     public ResponseEntity<Map<String, Object>> handleProductLimit(ProductLimitException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
@@ -30,12 +38,17 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
+    public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex,
+            jakarta.servlet.http.HttpServletRequest request) {
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .findFirst()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .orElse("Solicitud inválida");
-        return ResponseEntity.badRequest().body(Map.of("message", message));
+        Map<String, String> errors = new java.util.LinkedHashMap<>();
+        ex.getBindingResult().getFieldErrors().forEach(error ->
+                errors.putIfAbsent(error.getField(), error.getDefaultMessage()));
+        return ResponseEntity.badRequest().body(Map.of("message", message, "status", 400,
+                "code", "VALIDATION_ERROR", "errors", errors, "path", request.getRequestURI()));
     }
 
     @ExceptionHandler({ConstraintViolationException.class, HttpMessageNotReadableException.class})

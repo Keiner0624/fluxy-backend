@@ -1,5 +1,11 @@
 package com.fluxyBackend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+
 import com.fluxyBackend.exception.NotFoundException;
 
 import com.fluxyBackend.entity.Company.Plan;
@@ -17,6 +23,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Map;
 
+@Tag(name = "Inteligencia artificial", description = "Generación de contenido para productos.")
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/ai")
 @RequiredArgsConstructor
@@ -27,6 +35,11 @@ public class AIController {
     @Value("${gemini.api.key}")
     private String geminiApiKey;
 
+    @Operation(summary = "Generar una descripción de producto",
+            description = "Requiere plan BUSINESS y name. price y category son opcionales. Devuelve description; responde 403 sin el plan requerido y 502 si el proveedor rechaza la solicitud.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = "{\"name\":\"Mochila urbana\",\"price\":\"89.90\",\"category\":\"Accesorios\"}"))))
     @PostMapping("/describe")
     public ResponseEntity<?> generateDescription(
             Authentication authentication,

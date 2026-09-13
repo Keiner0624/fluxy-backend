@@ -30,6 +30,7 @@ public class AuthService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final CompanyService companyService;
+    private final BusinessRegistrationService businessRegistrationService;
 
     /**
      * Hash contra el que se compara cuando el correo no existe, para que el
@@ -85,55 +86,25 @@ public class AuthService {
         return new AuthResponse(token);
     }
 
-    @Transactional
     public RegisterBussinesResponse registerBusiness(RegisterBussinesRequest request) {
-        String normalizedEmail = normalizeEmail(request.email);
-        String businessName = normalizeText(request.businesName);
-        String whatsapp = normalizeText(request.whatssapp);
-
-        User existingUser = userRepository.findByEmailIgnoreCase(normalizedEmail).orElse(null);
-        if (existingUser != null) {
-            if (!passwordEncoder.matches(request.password, existingUser.getPassword())) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "El email ya existe. Inicia sesion con esa cuenta");
+        // Retry slug races only after the failed transaction has fully rolled back.
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                var created = businessRegistrationService.create(request);
+                return buildRegisterBusinessResponse(created.company(), created.user(),
+                        jwtService.generateToken(created.user().getEmail()));
+            } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+                if (userRepository.existsByEmailIgnoreCase(normalizeEmail(request.email))) {
+                    throw BusinessRegistrationService.duplicateEmail();
+                }
+                if (attempt == 2) {
+                    throw new com.fluxyBackend.exception.RegistrationException(
+                            HttpStatus.CONFLICT, "REGISTRATION_FAILED", "",
+                            "No se pudo crear la tienda. Intenta nuevamente.");
+                }
             }
-
-            Company existingCompany = existingUser.getCompany();
-            if (existingCompany == null) {
-                Company company = Company.builder()
-                        .name(businessName)
-                        .email(normalizedEmail)
-                        .phone(whatsapp)
-                        .build();
-                existingCompany = companyService.createCompany(company);
-                existingUser.setCompany(existingCompany);
-                existingUser.setRole(Role.BUSINESS_OWNER);
-                existingUser = userRepository.save(existingUser);
-            }
-
-            String token = jwtService.generateToken(existingUser.getEmail());
-            return buildRegisterBusinessResponse(existingCompany, existingUser, token);
         }
-
-        Company company = Company.builder()
-                .name(businessName)
-                .email(normalizedEmail)
-                .phone(whatsapp)
-                .build();
-        Company savedCompany = companyService.createCompany(company);
-
-        User user = User.builder()
-                .fullName(businessName)
-                .firstName(businessName)
-                .email(normalizedEmail)
-                .password(passwordEncoder.encode(request.password))
-                .role(Role.BUSINESS_OWNER)
-                .company(savedCompany)
-                .build();
-        userRepository.save(user);
-
-        String token = jwtService.generateToken(user.getEmail());
-        return buildRegisterBusinessResponse(savedCompany, user, token);
+        throw new IllegalStateException("Registration retry exhausted");
     }
 
     private RegisterBussinesResponse buildRegisterBusinessResponse(Company company, User user,
@@ -144,6 +115,8 @@ public class AuthService {
         response.company = new RegisterBussinesResponse.CompanyInfo();
         response.company.id = company.getId();
         response.company.name = company.getName();
+        response.company.tradeName = company.getName();
+        response.company.role = "OWNER";
         response.company.slug = company.getSlug();
         response.company.storeUrl =
                 "https://fluxy-frontend-react-xtsb.vercel.app/?store=" + company.getSlug();
@@ -151,6 +124,7 @@ public class AuthService {
         response.company.whatssapp = company.getPhone();
 
         response.user = new RegisterBussinesResponse.UserInfo();
+        response.user.id = user.getId();
         response.user.fullName = user.getFullName();
         response.user.email = user.getEmail();
 
@@ -181,7 +155,7 @@ public class AuthService {
     }
 
     private String normalizeEmail(String email) {
-        return email == null ? null : email.trim().toLowerCase();
+        return email == null ? null : email.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     private String normalizeText(String value) {

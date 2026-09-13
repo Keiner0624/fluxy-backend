@@ -1,5 +1,8 @@
 package com.fluxyBackend.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import com.fluxyBackend.DTOs.LoginRequest;
 import com.fluxyBackend.DTOs.RegisterBussinesRequest;
 import com.fluxyBackend.DTOs.RegisterBussinesResponse;
@@ -16,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.function.Function;
 
+@Tag(name = "Autenticación", description = "Registro e inicio de sesión de vendedores y administradores.")
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -24,17 +28,23 @@ public class AuthController {
     private final AuthService authService;
     private final LoginAttemptService loginAttemptService;
 
+    @Operation(summary = "Registrar un usuario",
+            description = "Crea un usuario asociado a una empresa existente.")
     @PostMapping("/register")
     public String register(@RequestBody @Valid RegisterRequest request) {
         return authService.register(request);
     }
 
+    @Operation(summary = "Iniciar sesión",
+            description = "Devuelve el JWT del vendedor. Responde 401 ante credenciales inválidas y 429 con Retry-After si hay demasiados intentos fallidos.")
     @PostMapping("/login")
     public AuthResponse login(@RequestBody @Valid LoginRequest request,
                               HttpServletRequest http) {
         return conLimiteDeIntentos(request, http, authService::login);
     }
 
+    @Operation(summary = "Registrar una tienda",
+            description = "Crea la empresa y su propietario. Devuelve el token y los datos del negocio.")
     @PostMapping("/register-business")
     public RegisterBussinesResponse registerBusiness(
             @RequestBody @Valid RegisterBussinesRequest request) {
@@ -42,6 +52,8 @@ public class AuthController {
     }
 
     // ─── Login exclusivo para el administrador de Fluxy ──────────────────────
+    @Operation(summary = "Iniciar sesión como administrador",
+            description = "Devuelve un JWT con rol ADMIN. Responde 401 ante credenciales inválidas y 429 con Retry-After si se bloquean los intentos.")
     @PostMapping("/admin-login")
     public AuthResponse adminLogin(@RequestBody @Valid LoginRequest request,
                                    HttpServletRequest http) {

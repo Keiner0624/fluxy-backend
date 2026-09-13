@@ -20,12 +20,16 @@ public class JwtService {
     private static final int MIN_KEY_BYTES = 32;
 
     private static final String COMO_GENERARLA = """
-            Generá una y definila como variable de entorno JWT_SECRET:
+            Generá una y definila como variable de entorno JWT_SECRET
+            o guardala en el archivo .env de la raíz del proyecto:
 
               PowerShell:  [Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Max 256 }))
               Linux/macOS: openssl rand -base64 32
 
             En IntelliJ: Run > Edit Configurations > Environment variables.
+              Nombre: JWT_SECRET
+              Valor: la clave Base64 generada (no usar la clave como nombre).
+            En .env: JWT_SECRET=tu_clave_base64 (sin comillas).
             En Render:   Environment > Add Environment Variable.
 
             No la agregues a application.properties: ese archivo va al repositorio.""";
