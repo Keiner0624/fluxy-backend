@@ -18,7 +18,9 @@ public record PublicStoreResponse(
         /* Integraciones que la tienda carga en el navegador del comprador. */
         String googleAnalyticsId,
         String metaPixelId,
-        boolean whatsappEnabled
+        boolean whatsappEnabled,
+        /* false mientras la tienda está suspendida: se ve el catálogo pero no se aceptan pedidos. */
+        boolean acceptingOrders
 ) {
     public static PublicStoreResponse from(Company company) {
         return from(company, null);
@@ -39,7 +41,8 @@ public record PublicStoreResponse(
                 company.getPlan(),
                 integrations == null ? null : integrations.getGoogleAnalyticsId(),
                 integrations == null ? null : integrations.getMetaPixelId(),
-                integrations == null || integrations.isWhatsappEnabled()
+                integrations == null || integrations.isWhatsappEnabled(),
+                company.getStatus() != Company.Status.SUSPENDED
         );
     }
 }

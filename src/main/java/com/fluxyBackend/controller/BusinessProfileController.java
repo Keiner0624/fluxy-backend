@@ -22,7 +22,7 @@ public class BusinessProfileController {
     }
 
     @PutMapping
-    @RequirePermission(Permission.STORE_MANAGE)
+    @RequirePermission(Permission.SETTINGS_MANAGE)
     public BusinessProfileService.Details save(Authentication authentication,
             @RequestBody @Valid BusinessProfileRequest request) {
         return service.save(authentication.getName(), request);

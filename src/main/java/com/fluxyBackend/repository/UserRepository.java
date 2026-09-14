@@ -18,4 +18,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * puede ser un invitado, así que avisos y cobros tienen que buscar por rol.
      */
     Optional<User> findFirstByCompanyIdAndRoleOrderByIdAsc(Long companyId, Role role);
+
+    List<User> findByStatusAndCreatedAtBefore(User.Status status, java.time.LocalDateTime before);
 }

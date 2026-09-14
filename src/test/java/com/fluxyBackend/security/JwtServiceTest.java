@@ -1,5 +1,7 @@
 package com.fluxyBackend.security;
 
+import com.fluxyBackend.entity.User;
+import io.jsonwebtoken.ExpiredJwtException;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -22,7 +24,6 @@ class JwtServiceTest {
     private JwtService servicioCon(String secret) {
         JwtService service = new JwtService();
         ReflectionTestUtils.setField(service, "secretKey", secret);
-        ReflectionTestUtils.setField(service, "jwtExpiration", 3_600_000L);
         return service;
     }
 
@@ -53,28 +54,52 @@ class JwtServiceTest {
         assertThatCode(() -> servicioCon(CLAVE_VALIDA).init()).doesNotThrowAnyException();
     }
 
+    private static User usuario(String email) {
+        User user = new User();
+        user.setId(7L);
+        user.setEmail(email);
+        return user;
+    }
+
     @Test
-    void elTokenGeneradoEsValidoParaSuDuenio() {
+    void elAccessTokenLlevaUsuarioYSesion() {
         JwtService service = servicioCon(CLAVE_VALIDA);
         service.init();
 
-        String token = service.generateToken("duenio@fluxy.test");
+        String token = service.generateAccessToken(usuario("duenio@fluxy.test"), "sesion-1");
+        JwtService.TokenClaims claims = service.parse(token);
 
-        assertThat(service.extractUsername(token)).isEqualTo("duenio@fluxy.test");
-        assertThat(service.isTokenValid(token, "duenio@fluxy.test")).isTrue();
-        assertThat(service.isTokenValid(token, "otro@fluxy.test")).isFalse();
+        assertThat(claims.subject()).isEqualTo("duenio@fluxy.test");
+        assertThat(claims.userId()).isEqualTo(7L);
+        assertThat(claims.sessionId()).isEqualTo("sesion-1");
+        assertThat(claims.type()).isEqualTo(JwtService.TYPE_ACCESS);
+    }
+
+    @Test
+    void elAccessTokenDuraQuinceMinutos() {
+        assertThat(servicioCon(CLAVE_VALIDA).accessTtl()).hasMinutes(15);
+    }
+
+    @Test
+    void unTokenVencidoNoSeAcepta() {
+        JwtService service = servicioCon(CLAVE_VALIDA);
+        ReflectionTestUtils.setField(service, "accessTtlMinutes", -1L);
+        service.init();
+        String vencido = service.generateAccessToken(usuario("duenio@fluxy.test"), "sesion-1");
+
+        assertThatThrownBy(() -> service.parse(vencido)).isInstanceOf(ExpiredJwtException.class);
     }
 
     @Test
     void unTokenFirmadoConOtraClaveNoSeAcepta() {
         JwtService emisor = servicioCon(Base64.getEncoder().encodeToString("otra-clave-de-32-bytes-exactos!!".getBytes()));
         emisor.init();
-        String tokenAjeno = emisor.generateToken("intruso@fluxy.test");
+        String tokenAjeno = emisor.generateAccessToken(usuario("intruso@fluxy.test"), "sesion-x");
 
         JwtService receptor = servicioCon(CLAVE_VALIDA);
         receptor.init();
 
-        assertThatThrownBy(() -> receptor.extractUsername(tokenAjeno))
+        assertThatThrownBy(() -> receptor.parse(tokenAjeno))
                 .isInstanceOf(Exception.class);
     }
 }

@@ -20,7 +20,7 @@ class SecurityConfigIntegrationTest {
     @Test
     void meEndpointRequiresAuthentication() throws Exception {
         mockMvc.perform(get("/me"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

@@ -58,6 +58,44 @@ public class Company {
     @Builder.Default
     private Boolean trialUsed = false;
 
+    // ─── Ciclo de vida por inactividad ───────────────────────────────────────
+    public enum Status {
+        ACTIVE,
+        /** 30 días sin actividad real: la tienda sigue abierta y se avisa. */
+        INACTIVE,
+        /** 60 días: la tienda no recibe pedidos; el dueño puede reactivarla. */
+        SUSPENDED,
+        /** 90 días: la tienda sale de línea. */
+        ARCHIVED,
+        /** Eliminación programada, por inactividad prolongada o a pedido del dueño. */
+        DELETION_PENDING,
+        /** Datos personales anonimizados; ya no se puede usar. */
+        ANONYMIZED
+    }
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 24)
+    private Status status;
+
+    /** Última acción de negocio real. Abrir el panel no cuenta. */
+    private LocalDateTime lastBusinessActivityAt;
+    private LocalDateTime inactiveAt;
+    private LocalDateTime suspendedAt;
+    private LocalDateTime archivedAt;
+    private LocalDateTime deletionScheduledAt;
+
+    /** INACTIVITY u OWNER_REQUEST. */
+    @Column(length = 32)
+    private String suspensionReason;
+
+    public Status getStatus() { return status == null ? Status.ACTIVE : status; }
+
+    /** Plan pago vigente: no se suspende por inactividad. */
+    public boolean hasActivePaidPlan() {
+        return plan != null && plan != Plan.FREE
+                && (planExpiresAt == null || planExpiresAt.isAfter(LocalDateTime.now()));
+    }
+
     // ─── Getters/Setters existentes (se mantienen por compatibilidad) ────────
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

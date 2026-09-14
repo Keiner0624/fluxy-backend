@@ -77,6 +77,11 @@ public class MercadoPagoController {
     @PostConstruct
     void configureSdk() {
         MercadoPagoConfig.setAccessToken(accessToken);
+        // Sin límites explícitos, un Mercado Pago lento dejaba colgado el hilo de la petición.
+        MercadoPagoConfig.setConnectionTimeout(5_000);
+        MercadoPagoConfig.setConnectionRequestTimeout(5_000);
+        MercadoPagoConfig.setSocketTimeout(15_000);
+        MercadoPagoConfig.setMaxConnections(20);
     }
 
     @Operation(summary = "Crear una preferencia de pago",

@@ -49,6 +49,8 @@ public class AdminController {
     private final com.fluxyBackend.repository.CompanyIntegrationsRepository integrationsRepository;
     private final com.fluxyBackend.repository.CustomerRepository customerRepository;
     private final jakarta.persistence.EntityManager entityManager;
+    private final com.fluxyBackend.service.AuditService auditService;
+    private final com.fluxyBackend.security.SessionService sessionService;
 
     private void requireAdmin(Authentication auth) {
         String email      = auth.getName();
@@ -246,10 +248,13 @@ public class AdminController {
                     "La cantidad de meses debe estar entre 1 y 12");
         }
 
+        Plan previous = company.getPlan();
         company.setPlan(plan);
         company.setPlanActivatedAt(LocalDateTime.now());
         company.setPlanExpiresAt(plan == Plan.FREE ? null : LocalDateTime.now().plusMonths(months));
         companyRepository.save(company);
+        auditService.record(companyId, null, com.fluxyBackend.service.AuditAction.PLAN_CHANGED, "COMPANY", companyId,
+                Map.of("from", String.valueOf(previous), "to", plan.name(), "months", months, "by", "ADMIN"));
 
         return ResponseEntity.ok(Map.of("message", "Plan actualizado a " + planStr));
     }
@@ -292,9 +297,34 @@ public class AdminController {
         entityManager.createQuery("DELETE FROM PushSubscription p WHERE p.user.id IN "
                         + "(SELECT u.id FROM User u WHERE u.company.id = :companyId)")
                 .setParameter("companyId", companyId).executeUpdate();
+        // Seguridad de las cuentas: sesiones, códigos, identidades y borradores de registro.
+        List<Long> userIds = users.stream().map(User::getId).toList();
+        if (!userIds.isEmpty()) {
+            for (String entity : List.of("UserSession", "VerificationChallenge", "UserIdentity", "SignupDraft")) {
+                entityManager.createQuery("DELETE FROM " + entity + " e WHERE e.userId IN :ids")
+                        .setParameter("ids", userIds).executeUpdate();
+            }
+        }
+        entityManager.createQuery("DELETE FROM OwnershipTransfer t WHERE t.companyId = :companyId")
+                .setParameter("companyId", companyId).executeUpdate();
         userRepository.deleteAll(users);
         companyRepository.delete(company);
+        auditService.recordSecurityEvent(companyId, null, "admin", com.fluxyBackend.service.AuditAction.COMPANY_ANONYMIZED,
+                Map.of("by", "ADMIN_DELETE"));
 
         return ResponseEntity.ok(Map.of("message", "Vendedor eliminado correctamente."));
+    }
+
+    // ─── Cerrar sesiones de un negocio ────────────────────────────────────────
+    @Operation(summary = "Cerrar todas las sesiones de un negocio",
+            description = "Respuesta a incidentes: revoca los refresh tokens de todas las personas del negocio.")
+    @PostMapping("/vendors/{companyId}/revoke-sessions")
+    public Map<String, Object> revokeSessions(@PathVariable Long companyId, Authentication auth) {
+        requireAdmin(auth);
+        companyRepository.findById(companyId).orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
+        int revoked = sessionService.revokeAllForCompany(companyId, "ADMIN_INCIDENT");
+        auditService.recordSecurityEvent(companyId, null, "admin", com.fluxyBackend.service.AuditAction.SESSIONS_REVOKED_ALL,
+                Map.of("revoked", revoked, "by", "ADMIN"));
+        return Map.of("revoked", revoked);
     }
 }

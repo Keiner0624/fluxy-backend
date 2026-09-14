@@ -1,27 +1,36 @@
 package com.fluxyBackend.service;
 
-import com.fluxyBackend.DTOs.RegisterBussinesRequest;
-import com.fluxyBackend.DTOs.RegisterBussinesResponse;
 import com.fluxyBackend.DTOs.LoginRequest;
 import com.fluxyBackend.DTOs.RegisterRequest;
 import com.fluxyBackend.controller.AuthResponse;
-import com.fluxyBackend.entity.Company;
-import com.fluxyBackend.entity.Role;
-import com.fluxyBackend.entity.User;
+import com.fluxyBackend.entity.*;
+import com.fluxyBackend.exception.BusinessException;
+import com.fluxyBackend.exception.ForbiddenException;
+import com.fluxyBackend.repository.MembershipRepository;
+import com.fluxyBackend.repository.UserIdentityRepository;
 import com.fluxyBackend.repository.UserRepository;
 import com.fluxyBackend.security.JwtService;
+import com.fluxyBackend.security.SecurityMonitor;
+import com.fluxyBackend.security.SessionService;
+import com.fluxyBackend.security.oauth.OAuthNonceService;
+import com.fluxyBackend.security.oauth.OidcTokenVerifier;
+import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.beans.factory.annotation.Value;
-import jakarta.annotation.PostConstruct;
-import java.util.UUID;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -30,8 +39,17 @@ public class AuthService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final CompanyService companyService;
-    private final BusinessRegistrationService businessRegistrationService;
-    private final com.fluxyBackend.repository.MembershipRepository membershipRepository;
+    private final MembershipRepository membershipRepository;
+    private final UserIdentityRepository identityRepository;
+    private final SessionService sessionService;
+    private final SignupService signupService;
+    private final OidcTokenVerifier oidcTokenVerifier;
+    private final OAuthNonceService nonceService;
+    private final AuditService auditService;
+    private final SecurityMonitor monitor;
+
+    /** Resultado del acceso con Google o Apple: sesión abierta, o registro por completar. */
+    public record OAuthResult(String status, AuthResponse session, SignupService.SignupState signup) {}
 
     /**
      * Hash contra el que se compara cuando el correo no existe, para que el
@@ -63,12 +81,14 @@ public class AuthService {
                 .email(normalizedEmail)
                 .password(passwordEncoder.encode(request.password))
                 .role(Role.BUSINESS_OWNER)
-                .company(company) // 🔥 AQUÍ ESTÁ LA CLAVE
+                .company(company)
                 .build();
         userRepository.save(user);
         return "Usuario registrado correctamente";
     }
-    public AuthResponse login(LoginRequest request){
+
+    @Transactional
+    public AuthResponse login(LoginRequest request, HttpServletRequest http) {
         String normalizedEmail = normalizeEmail(request.email);
         User user = userRepository.findByEmailIgnoreCase(normalizedEmail).orElse(null);
 
@@ -79,73 +99,87 @@ public class AuthService {
         String hash = user != null ? user.getPassword() : hashSenuelo;
         boolean passwordCorrecta = passwordEncoder.matches(request.password, hash);
 
-        if (user == null || !passwordCorrecta) {
+        if (user == null || !passwordCorrecta || !user.hasPassword()) {
+            monitor.recordLogin(false);
+            if (user != null) {
+                auditService.recordSecurityEvent(user.getCompany() == null ? null : user.getCompany().getId(),
+                        user, null, AuditAction.LOGIN_FAILED, Map.of("method", "PASSWORD"));
+            }
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales invalidas");
         }
 
-        // Solo después de validar la contraseña: a un tercero no le revela nada.
-        if (user.getCompany() != null) {
-            membershipRepository.findByUserIdAndCompanyId(user.getId(), user.getCompany().getId())
-                    .filter(m -> !m.isActive())
-                    .ifPresent(m -> {
-                        throw new com.fluxyBackend.exception.ForbiddenException(
-                                com.fluxyBackend.exception.ForbiddenException.ACCESS_DISABLED,
-                                "Tu acceso a este negocio fue desactivado. Consultá con el dueño.");
-                    });
-        }
-
-        String token = jwtService.generateToken(user.getEmail());
-        return new AuthResponse(token);
+        // Todo lo que sigue ocurre solo con la contraseña correcta: a un tercero no le revela nada.
+        ensureCanSignIn(user);
+        AuthResponse session = sessionService.create(user, UserSession.AuthMethod.PASSWORD, request.rememberMe, http);
+        monitor.recordLogin(true);
+        auditService.record(user.getCompany().getId(), user, AuditAction.LOGIN_SUCCESS, "USER", user.getId(),
+                Map.of("method", "PASSWORD", "rememberMe", request.rememberMe));
+        return session;
     }
 
-    public RegisterBussinesResponse registerBusiness(RegisterBussinesRequest request) {
-        // Retry slug races only after the failed transaction has fully rolled back.
-        for (int attempt = 0; attempt < 3; attempt++) {
-            try {
-                var created = businessRegistrationService.create(request);
-                return buildRegisterBusinessResponse(created.company(), created.user(),
-                        jwtService.generateToken(created.user().getEmail()));
-            } catch (org.springframework.dao.DataIntegrityViolationException ex) {
-                if (userRepository.existsByEmailIgnoreCase(normalizeEmail(request.email))) {
-                    throw BusinessRegistrationService.duplicateEmail();
-                }
-                if (attempt == 2) {
-                    throw new com.fluxyBackend.exception.RegistrationException(
-                            HttpStatus.CONFLICT, "REGISTRATION_FAILED", "",
-                            "No se pudo crear la tienda. Intenta nuevamente.");
-                }
+    @Transactional
+    public OAuthResult oauth(UserIdentity.Provider provider, String idToken, String nonce, String nameHint,
+                             boolean rememberMe, HttpServletRequest http) {
+        nonceService.consume(nonce);
+        OidcTokenVerifier.VerifiedIdentity identity = oidcTokenVerifier.verify(provider, idToken, nonce);
+
+        UserIdentity linked = identityRepository.findByProviderAndProviderUserId(provider, identity.subject()).orElse(null);
+        if (linked != null) {
+            User user = userRepository.findById(linked.getUserId())
+                    .orElseThrow(() -> new BusinessException(HttpStatus.UNAUTHORIZED, "OAUTH_TOKEN_INVALID", "Cuenta no encontrada."));
+            linked.setLastUsedAt(LocalDateTime.now());
+            identityRepository.save(linked);
+            if (user.getStatus() == User.Status.PENDING_VERIFICATION) {
+                return new OAuthResult("ONBOARDING_REQUIRED", null, signupService.resume(user));
             }
+            ensureCanSignIn(user);
+            UserSession.AuthMethod method = provider == UserIdentity.Provider.GOOGLE
+                    ? UserSession.AuthMethod.GOOGLE : UserSession.AuthMethod.APPLE;
+            AuthResponse session = sessionService.create(user, method, rememberMe, http);
+            monitor.recordLogin(true);
+            auditService.record(user.getCompany().getId(), user, AuditAction.LOGIN_SUCCESS, "USER", user.getId(),
+                    Map.of("method", provider.name()));
+            return new OAuthResult("LOGGED_IN", session, null);
         }
-        throw new IllegalStateException("Registration retry exhausted");
+
+        // Nunca se crea un duplicado ni se vincula solo: quien controla la cuenta decide desde Seguridad.
+        if (userRepository.existsByEmailIgnoreCase(identity.email())) {
+            throw new BusinessException(HttpStatus.CONFLICT, "ACCOUNT_EXISTS",
+                    "Ya tenés una cuenta con este correo. Iniciá sesión con tu contraseña y vinculá "
+                            + OidcTokenVerifier.label(provider) + " desde Seguridad.");
+        }
+        return new OAuthResult("ONBOARDING_REQUIRED", null, signupService.startWithIdentity(identity, nameHint));
     }
 
-    private RegisterBussinesResponse buildRegisterBusinessResponse(Company company, User user,
-                                                                   String token) {
-        RegisterBussinesResponse response = new RegisterBussinesResponse();
-        response.token = token;
-
-        response.company = new RegisterBussinesResponse.CompanyInfo();
-        response.company.id = company.getId();
-        response.company.name = company.getName();
-        response.company.tradeName = company.getName();
-        response.company.role = "OWNER";
-        response.company.slug = company.getSlug();
-        response.company.storeUrl =
-                "https://fluxy-frontend-react-xtsb.vercel.app/?store=" + company.getSlug();
-        response.company.phone = company.getPhone();
-        response.company.whatssapp = company.getPhone();
-
-        response.user = new RegisterBussinesResponse.UserInfo();
-        response.user.id = user.getId();
-        response.user.fullName = user.getFullName();
-        response.user.email = user.getEmail();
-
-        return response;
+    /** Estado de la cuenta y de su acceso a la empresa, una vez probada la identidad. */
+    private void ensureCanSignIn(User user) {
+        if (user.getStatus() == User.Status.PENDING_VERIFICATION) {
+            SignupService.SignupState state = signupService.resume(user);
+            Map<String, Object> details = new HashMap<>();
+            details.put("signupToken", state.signupToken());
+            details.put("pending", state.pending());
+            throw new BusinessException(HttpStatus.FORBIDDEN, ForbiddenException.VERIFICATION_REQUIRED,
+                    "Tu cuenta todavía no está verificada. Te enviamos el código para terminar.", details);
+        }
+        if (user.getStatus() == User.Status.DISABLED) {
+            throw new ForbiddenException(ForbiddenException.ACCESS_DISABLED, "Esta cuenta está bloqueada. Escribinos a soporte.");
+        }
+        if (user.getCompany() == null) {
+            throw new ForbiddenException(ForbiddenException.NO_COMPANY, "Tu cuenta no está asociada a ningún negocio.");
+        }
+        if (user.getCompany().getStatus() == Company.Status.ANONYMIZED) {
+            throw new ForbiddenException("ACCOUNT_CLOSED", "Este negocio fue eliminado.");
+        }
+        membershipRepository.findByUserIdAndCompanyId(user.getId(), user.getCompany().getId())
+                .filter(m -> !m.isActive())
+                .ifPresent(m -> {
+                    throw new ForbiddenException(ForbiddenException.ACCESS_DISABLED,
+                            "Tu acceso a este negocio fue desactivado. Consultá con el dueño.");
+                });
     }
-
 
     // ─── Login de administrador (sin cuenta en BD) ────────────────────────────
-    public AuthResponse adminLogin(LoginRequest request) {
+    public AuthResponse adminLogin(LoginRequest request, HttpServletRequest http) {
         if (adminEmail.isBlank() || adminPassword.isBlank()) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "Credenciales de admin no configuradas.");
@@ -158,24 +192,15 @@ public class AuthService {
                 request.password.getBytes(StandardCharsets.UTF_8),
                 adminPassword.getBytes(StandardCharsets.UTF_8));
         if (!emailMatches || !passwordMatches) {
+            monitor.recordLogin(false);
+            auditService.recordSecurityEvent(null, null, "admin", AuditAction.LOGIN_FAILED, Map.of("method", "ADMIN"));
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales incorrectas.");
         }
-
-        // Generar token con email de admin
-        String token = jwtService.generateAdminToken(normalizeEmail(adminEmail));
-        return new AuthResponse(token);
+        auditService.recordSecurityEvent(null, null, "admin", AuditAction.LOGIN_SUCCESS, Map.of("method", "ADMIN"));
+        return new AuthResponse(jwtService.generateAdminToken(normalizeEmail(adminEmail)));
     }
 
     private String normalizeEmail(String email) {
-        return email == null ? null : email.trim().toLowerCase(java.util.Locale.ROOT);
-    }
-
-    private String normalizeText(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-
+        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
 }

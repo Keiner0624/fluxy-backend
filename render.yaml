@@ -18,7 +18,8 @@ services:
     region: oregon
     dockerfilePath: ./Dockerfile
     healthCheckPath: /actuator/health
-    autoDeploy: true
+    # Despliega solo cuando el CI de GitHub (pruebas + build) pasa.
+    autoDeployTrigger: checksPass
 
     envVars:
       # ── Base de datos ──────────────────────────────────────────────────
@@ -74,3 +75,24 @@ services:
         sync: false
       - key: VERCEL_TEAM_ID
         sync: false
+
+      # ── Verificación y acceso con proveedores ──────────────────────────
+      # Sin estas variables el registro verifica solo el correo y los botones
+      # de Google y Apple no aparecen.
+      - key: WHATSAPP_CLOUD_TOKEN
+        sync: false
+      - key: WHATSAPP_CLOUD_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_CLOUD_OTP_TEMPLATE
+        sync: false
+      - key: OAUTH_GOOGLE_CLIENT_ID
+        sync: false
+      - key: OAUTH_APPLE_CLIENT_ID
+        sync: false
+      - key: OAUTH_APPLE_REDIRECT_URI
+        sync: false
+      - key: SECURITY_ALERT_EMAIL
+        sync: false
+      # Anonimización definitiva de negocios eliminados: activar solo con backups verificados.
+      - key: LIFECYCLE_PURGE_ENABLED
+        value: "false"

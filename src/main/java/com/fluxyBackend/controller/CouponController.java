@@ -39,6 +39,7 @@ public class CouponController {
     private final CouponRepository  couponRepository;
     private final UserRepository    userRepository;
     private final CompanyRepository companyRepository;
+    private final com.fluxyBackend.service.AuditService auditService;
 
     private User getUser(Authentication auth) {
         return userRepository.findByEmailIgnoreCase(auth.getName())
@@ -121,6 +122,7 @@ public class CouponController {
                 .orElseThrow(() -> new NotFoundException("Cupón no encontrado"));
 
         couponRepository.delete(coupon);
+        auditService.record(user.getCompany().getId(), user, com.fluxyBackend.service.AuditAction.COUPON_DELETED, "COUPON", id, null);
         return ResponseEntity.ok(Map.of("message", "Cupón eliminado."));
     }
 

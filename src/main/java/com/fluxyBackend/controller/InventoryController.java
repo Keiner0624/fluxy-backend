@@ -21,6 +21,7 @@ public class InventoryController {
 
     private final InventoryService inventoryService;
     private final AccessService accessService;
+    private final com.fluxyBackend.service.AuditService auditService;
 
     public record MinStockRequest(Integer minStock) {}
 
@@ -60,7 +61,9 @@ public class InventoryController {
     public InventoryService.MovementView adjust(@PathVariable Long productId,
                                                 @RequestBody InventoryService.AdjustRequest request) {
         Member member = accessService.current();
-        return inventoryService.adjust(member.company(), productId, request, member.displayName());
+        InventoryService.MovementView movement = inventoryService.adjust(member.company(), productId, request, member.displayName());
+        auditService.record(member, com.fluxyBackend.service.AuditAction.INVENTORY_ADJUSTED, "PRODUCT", productId, null);
+        return movement;
     }
 
     @Operation(summary = "Cambiar el stock mínimo", description = "Por debajo de este valor el producto aparece como stock bajo.")

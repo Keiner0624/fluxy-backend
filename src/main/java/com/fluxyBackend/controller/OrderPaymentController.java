@@ -24,6 +24,7 @@ public class OrderPaymentController {
 
     private final OrderPaymentService paymentService;
     private final AccessService accessService;
+    private final com.fluxyBackend.service.AuditService auditService;
 
     @Operation(summary = "Listar cobros",
             description = "Paginado. status PENDING, APPROVED, REJECTED o REFUNDED; q busca por número de pedido o referencia.")
@@ -80,6 +81,9 @@ public class OrderPaymentController {
     @RequirePermission(Permission.PAYMENT_REFUND)
     public OrderPaymentService.PaymentView refund(@PathVariable Long id,
                                                   @RequestBody OrderPaymentService.RefundRequest request) {
-        return paymentService.refund(accessService.current(), id, request);
+        com.fluxyBackend.security.access.Member member = accessService.current();
+        OrderPaymentService.PaymentView view = paymentService.refund(member, id, request);
+        auditService.record(member, com.fluxyBackend.service.AuditAction.PAYMENT_REFUNDED, "PAYMENT", id, null);
+        return view;
     }
 }

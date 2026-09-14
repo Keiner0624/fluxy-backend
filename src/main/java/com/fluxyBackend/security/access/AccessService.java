@@ -44,6 +44,14 @@ public class AccessService {
         return Optional.empty();
     }
 
+    /** Id de la sesión del access token de esta petición. */
+    public String currentSessionId() {
+        RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
+        Object sid = attributes == null ? null
+                : attributes.getAttribute(com.fluxyBackend.security.SessionService.REQUEST_SESSION_ID, RequestAttributes.SCOPE_REQUEST);
+        return sid instanceof String value ? value : null;
+    }
+
     /** Member de la petición en curso, resuelto una sola vez por petición. */
     public Member current() {
         RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
@@ -72,7 +80,13 @@ public class AccessService {
     }
 
     public Member resolve(String email) {
-        User user = userRepository.findByEmailIgnoreCase(email)
+        // El filtro JWT ya cargó el usuario: se reutiliza en lugar de consultarlo otra vez.
+        RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
+        Object loaded = attributes == null ? null
+                : attributes.getAttribute(com.fluxyBackend.security.JwtAuthenticationFilter.REQUEST_USER, RequestAttributes.SCOPE_REQUEST);
+        User user = loaded instanceof User cached && cached.getEmail().equalsIgnoreCase(email)
+                ? cached
+                : userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new ForbiddenException(ForbiddenException.NO_COMPANY, "Usuario no encontrado."));
         Company company = user.getCompany();
         if (company == null) {

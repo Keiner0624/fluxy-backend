@@ -60,6 +60,7 @@ public class SchemaUpgrade implements ApplicationRunner {
                 """);
 
         linkExistingOrdersToCustomers();
+        securityAndLifecycle();
 
         // Stock que ya existía antes del inventario: queda como punto de partida del historial.
         execute("""
@@ -71,6 +72,35 @@ public class SchemaUpgrade implements ApplicationRunner {
                 WHERE p.company_id IS NOT NULL
                   AND NOT EXISTS (SELECT 1 FROM inventory_movements m WHERE m.product_id = p.id)
                 """);
+    }
+
+    /** Cuentas y negocios anteriores al documento de seguridad. */
+    private void securityAndLifecycle() {
+        execute("UPDATE users SET status = 'ACTIVE' WHERE status IS NULL");
+        execute("UPDATE users SET password_enabled = TRUE WHERE password_enabled IS NULL");
+        execute("UPDATE users SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL");
+        execute("UPDATE company SET status = 'ACTIVE' WHERE status IS NULL");
+        // El reloj de inactividad arranca en la última venta conocida, o hoy.
+        execute("""
+                UPDATE company SET last_business_activity_at = COALESCE(
+                    (SELECT MAX(o.created_at) FROM orders o WHERE o.company_id = company.id), CURRENT_TIMESTAMP)
+                WHERE last_business_activity_at IS NULL
+                """);
+        execute("CREATE INDEX IF NOT EXISTS idx_users_company ON users (company_id)");
+        execute("CREATE INDEX IF NOT EXISTS idx_company_status ON company (status)");
+        execute("CREATE INDEX IF NOT EXISTS idx_customers_company ON customers (company_id)");
+
+        // El stock nunca queda negativo: además de la validación, lo garantiza la base.
+        if (isPostgres()) {
+            Integer negatives = jdbc.queryForObject("SELECT COUNT(*) FROM products WHERE stock < 0", Integer.class);
+            Integer existing = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM pg_constraint WHERE conname = 'chk_products_stock_non_negative'", Integer.class);
+            if (negatives != null && negatives == 0 && existing != null && existing == 0) {
+                execute("ALTER TABLE products ADD CONSTRAINT chk_products_stock_non_negative CHECK (stock >= 0)");
+            } else if (negatives != null && negatives > 0) {
+                log.warn("Hay {} productos con stock negativo: no se agregó la restricción de stock", negatives);
+            }
+        }
     }
 
     private void linkExistingOrdersToCustomers() {

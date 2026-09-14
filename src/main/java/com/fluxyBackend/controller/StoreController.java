@@ -13,6 +13,7 @@ import com.fluxyBackend.entity.Order;
 import com.fluxyBackend.entity.Prodcut;
 import com.fluxyBackend.repository.CompanyRepository;
 import com.fluxyBackend.repository.ProductRepository;
+import com.fluxyBackend.service.CompanyLifecycleService;
 import com.fluxyBackend.service.IntegrationService;
 import com.fluxyBackend.service.OrderService;
 import jakarta.validation.Valid;
@@ -33,14 +34,14 @@ public class StoreController {
     private final CompanyRepository companyRepository;
     private final OrderService orderService;
     private final IntegrationService integrationService;
+    private final CompanyLifecycleService lifecycleService;
 
     // ─── Catálogo público de productos ───────────────────────────────────────
     @Operation(summary = "Listar productos por empresa",
             description = "Consulta el catálogo público por identificador de empresa. No incluye productos ocultos.")
     @GetMapping("/{companyId}/products")
     public List<PublicProductResponse> getProducts(@PathVariable Long companyId) {
-        Company company = companyRepository.findById(companyId)
-                .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
+        Company company = byId(companyId);
         return visibleProducts(company);
     }
 
@@ -50,9 +51,11 @@ public class StoreController {
     @PostMapping("/{companyId}/order")
     public Map<String, Object> createOrder(@PathVariable Long companyId,
                                            @Valid @RequestBody CreateOrderRequest request) {
-        Company company = companyRepository.findById(companyId)
-                .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
-        return orderResponse(orderService.createOrderAsClient(request, company), company);
+        Company company = byId(companyId);
+        lifecycleService.ensureStoreAcceptsOrders(company);
+        Order order = orderService.createOrderAsClient(request, company);
+        lifecycleService.recordActivity(company.getId());
+        return orderResponse(order, company);
     }
 
     // ─── Info de empresa ──────────────────────────────────────────────────────
@@ -60,8 +63,7 @@ public class StoreController {
             description = "Devuelve los datos públicos de la tienda.")
     @GetMapping("/{companyId}/info")
     public PublicStoreResponse getCompanyInfo(@PathVariable Long companyId) {
-        Company company = companyRepository.findById(companyId)
-                .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
+        Company company = byId(companyId);
         return PublicStoreResponse.from(company, integrationService.settings(company.getId()));
     }
 
@@ -70,8 +72,7 @@ public class StoreController {
             description = "Devuelve los datos públicos usando el slug de la tienda.")
     @GetMapping("/slug/{slug}/info")
     public PublicStoreResponse getBySlug(@PathVariable String slug) {
-        Company company = companyRepository.findBySlug(slug)
-                .orElseThrow(() -> new NotFoundException("Tienda no encontrada"));
+        Company company = bySlug(slug);
         return PublicStoreResponse.from(company, integrationService.settings(company.getId()));
     }
 
@@ -79,8 +80,7 @@ public class StoreController {
             description = "Consulta el catálogo público usando el slug de la tienda. No incluye productos ocultos.")
     @GetMapping("/slug/{slug}/products")
     public List<PublicProductResponse> getProductsBySlug(@PathVariable String slug) {
-        Company company = companyRepository.findBySlug(slug)
-                .orElseThrow(() -> new NotFoundException("Tienda no encontrada"));
+        Company company = bySlug(slug);
         return visibleProducts(company);
     }
 
@@ -90,9 +90,26 @@ public class StoreController {
     @PostMapping("/slug/{slug}/order")
     public Map<String, Object> createOrderBySlug(@PathVariable String slug,
                                                  @Valid @RequestBody CreateOrderRequest request) {
+        Company company = bySlug(slug);
+        lifecycleService.ensureStoreAcceptsOrders(company);
+        Order order = orderService.createOrderAsClient(request, company);
+        lifecycleService.recordActivity(company.getId());
+        return orderResponse(order, company);
+    }
+
+    /** Tiendas archivadas o por eliminarse no se muestran (410 STORE_OFFLINE). */
+    private Company byId(Long companyId) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
+        lifecycleService.ensureStoreOnline(company);
+        return company;
+    }
+
+    private Company bySlug(String slug) {
         Company company = companyRepository.findBySlug(slug)
                 .orElseThrow(() -> new NotFoundException("Tienda no encontrada"));
-        return orderResponse(orderService.createOrderAsClient(request, company), company);
+        lifecycleService.ensureStoreOnline(company);
+        return company;
     }
 
     private List<PublicProductResponse> visibleProducts(Company company) {

@@ -35,13 +35,17 @@ public class OrderController {
 
     private final OrderService            orderService;
     private final AccessService           accessService;
+    private final com.fluxyBackend.service.AuditService auditService;
 
     @Operation(summary = "Crear un pedido",
             description = "Calcula el total usando los precios del catálogo y valida las cantidades.")
     @PostMapping
     @RequirePermission(Permission.ORDER_UPDATE)
     public Order createOrder(@Valid @RequestBody CreateOrderRequest request) {
-        return orderService.createOrder(request, accessService.current());
+        com.fluxyBackend.security.access.Member member = accessService.current();
+        Order order = orderService.createOrder(request, member);
+        auditService.record(member, com.fluxyBackend.service.AuditAction.ORDER_CREATED, "ORDER", order.getId(), Map.of("total", order.getTotal()));
+        return order;
     }
 
     @Operation(summary = "Listar mis pedidos",
@@ -89,7 +93,12 @@ public class OrderController {
     @PatchMapping("/{id}/status")
     @RequirePermission(value = {Permission.ORDER_UPDATE, Permission.ORDER_CANCEL}, any = true)
     public OrderService.OrderDetail changeStatus(@PathVariable Long id, @RequestBody OrderService.StatusRequest request) {
-        return orderService.changeStatus(accessService.current(), id, request);
+        com.fluxyBackend.security.access.Member member = accessService.current();
+        OrderService.OrderDetail detail = orderService.changeStatus(member, id, request);
+        if (request.status() != null && "CANCELLED".equalsIgnoreCase(request.status())) {
+            auditService.record(member, com.fluxyBackend.service.AuditAction.ORDER_CANCELLED, "ORDER", id, null);
+        }
+        return detail;
     }
 
     @Operation(summary = "Consultar un pedido",
@@ -105,7 +114,10 @@ public class OrderController {
     @PutMapping("/{id}/cancel")
     @RequirePermission(Permission.ORDER_CANCEL)
     public Order cancelOrder(@PathVariable Long id) {
-        return orderService.cancelOrder(id, accessService.current());
+        com.fluxyBackend.security.access.Member member = accessService.current();
+        Order order = orderService.cancelOrder(id, member);
+        auditService.record(member, com.fluxyBackend.service.AuditAction.ORDER_CANCELLED, "ORDER", id, null);
+        return order;
     }
 
     @Operation(summary = "Consultar el total de ventas",

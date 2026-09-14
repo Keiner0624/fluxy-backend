@@ -25,11 +25,47 @@ public class EmailService {
     @Value("${mail.from}")
     private String mailFrom;
 
+    /** Tras 5 fallos seguidos no se llama a SendGrid por un minuto. */
+    private final CircuitBreaker breaker = new CircuitBreaker("sendgrid", 5, java.time.Duration.ofMinutes(1));
+    private volatile SendGrid client;
+
+    public boolean isConfigured() {
+        return sendgridKey != null && !sendgridKey.isBlank();
+    }
+
+    /**
+     * Cliente con tiempos límite explícitos: sin ellos, un SendGrid lento dejaba
+     * colgado el hilo que enviaba el correo.
+     */
+    private SendGrid client() {
+        if (client == null) {
+            synchronized (this) {
+                if (client == null) {
+                    org.apache.http.client.config.RequestConfig config = org.apache.http.client.config.RequestConfig.custom()
+                            .setConnectTimeout(5_000)
+                            .setConnectionRequestTimeout(5_000)
+                            .setSocketTimeout(10_000)
+                            .build();
+                    org.apache.http.impl.client.CloseableHttpClient http = org.apache.http.impl.client.HttpClients.custom()
+                            .setDefaultRequestConfig(config)
+                            .build();
+                    client = new SendGrid(sendgridKey, new com.sendgrid.Client(http));
+                }
+            }
+        }
+        return client;
+    }
+
     // ─── Método base para enviar emails ──────────────────────────────────────
-    private void send(String toEmail, String toName, String subject, String html) {
-        if (sendgridKey == null || sendgridKey.isBlank()) {
-            log.warn("SendGrid no configurado. No se pudo enviar email a: {}", toEmail);
-            return;
+    /** @return true si SendGrid aceptó el correo. */
+    private boolean send(String toEmail, String toName, String subject, String html) {
+        if (!isConfigured()) {
+            log.warn("SendGrid no configurado. No se envió el correo \"{}\"", subject);
+            return false;
+        }
+        if (!breaker.allowRequest()) {
+            log.warn("SendGrid en pausa por fallos recientes. No se envió el correo \"{}\"", subject);
+            return false;
         }
         try {
             Email from    = new Email(mailFrom, "Fluxy");
@@ -37,17 +73,111 @@ public class EmailService {
             Content content = new Content("text/html", html);
             Mail mail = new Mail(from, subject, to, content);
 
-            SendGrid sg = new SendGrid(sendgridKey);
             Request req = new Request();
             req.setMethod(Method.POST);
             req.setEndpoint("mail/send");
             req.setBody(mail.build());
-            sg.api(req);
+            com.sendgrid.Response response = client().api(req);
 
-            log.info("Email enviado a: {} — Asunto: {}", toEmail, subject);
+            if (response.getStatusCode() >= 200 && response.getStatusCode() < 300) {
+                breaker.recordSuccess();
+                log.info("Correo enviado — Asunto: {}", subject);
+                return true;
+            }
+            // 4xx es un problema de configuración (remitente no verificado, clave inválida), no del proveedor.
+            if (response.getStatusCode() >= 500) breaker.recordFailure();
+            log.error("SendGrid rechazó el correo \"{}\": HTTP {}", subject, response.getStatusCode());
+            return false;
         } catch (Exception e) {
-            log.error("Error al enviar email a {}: {}", toEmail, e.getMessage());
+            breaker.recordFailure();
+            log.error("Error al enviar el correo \"{}\": {}", subject, e.getMessage());
+            return false;
         }
+    }
+
+    // ─── Seguridad de la cuenta ──────────────────────────────────────────────
+
+    /** Código de verificación. Un reintento: el envío es idempotente para quien lo recibe. */
+    public boolean sendVerificationCode(String toEmail, String toName, String code, String purposeLabel, long minutes) {
+        String html = securityLayout("Tu código de verificación",
+                "Usá este código para " + escape(purposeLabel) + ". Vence en " + minutes + " minutos.",
+                "<div style=\"margin:18px 0 6px; font-size:32px; font-weight:700; letter-spacing:8px; color:#0b172a;\">"
+                        + escape(code) + "</div>",
+                "Si no fuiste vos, ignorá este correo: sin el código nadie puede usar tu cuenta.");
+        String subject = code + " es tu código de Fluxy";
+        return send(toEmail, toName, subject, html) || send(toEmail, toName, subject, html);
+    }
+
+    public void sendNewDeviceLogin(String toEmail, String toName, String device, String ipPrefix, String when) {
+        String html = securityLayout("Nuevo inicio de sesión",
+                "Se inició sesión en tu cuenta de Fluxy desde un dispositivo nuevo.",
+                "<table style=\"margin:14px 0; font-size:14px; color:#526078;\">"
+                        + "<tr><td style=\"padding:3px 14px 3px 0;\">Dispositivo</td><td style=\"color:#0b172a;\">" + escape(device) + "</td></tr>"
+                        + "<tr><td style=\"padding:3px 14px 3px 0;\">Red aproximada</td><td style=\"color:#0b172a;\">" + escape(ipPrefix) + "</td></tr>"
+                        + "<tr><td style=\"padding:3px 14px 3px 0;\">Fecha</td><td style=\"color:#0b172a;\">" + escape(when) + "</td></tr></table>",
+                "Si no fuiste vos, cambiá tu contraseña y cerrá las demás sesiones desde Seguridad en tu panel.");
+        send(toEmail, toName, "Nuevo inicio de sesión en Fluxy", html);
+    }
+
+    public void sendSecurityNotice(String toEmail, String toName, String title, String text) {
+        String html = securityLayout(title, text, "",
+                "Si no reconocés este cambio, restablecé tu contraseña de inmediato y escribinos.");
+        send(toEmail, toName, title + " — Fluxy", html);
+    }
+
+    public boolean sendPasswordReset(String toEmail, String toName, String link, long minutes) {
+        String html = securityLayout("Restablecé tu contraseña",
+                "Hola " + escape(toName) + ", recibimos un pedido para restablecer tu contraseña. El enlace sirve una sola vez y vence en "
+                        + minutes + " minutos.",
+                "<a href=\"" + escape(link) + "\" style=\"display:inline-block; margin-top:14px; background:#1769e0; color:#ffffff; padding:11px 20px; border-radius:10px; font-weight:600; font-size:14px; text-decoration:none;\">Crear nueva contraseña</a>",
+                "Si no lo pediste, ignorá este correo: tu contraseña no cambia.");
+        return send(toEmail, toName, "Restablecé tu contraseña — Fluxy", html);
+    }
+
+    public void sendSecurityAlert(String adminEmail, String signal, String message) {
+        String html = securityLayout("Alerta: " + signal, message, "",
+                "Revisá los logs con el X-Request-Id y el registro de auditoría.");
+        send(adminEmail, "Administración Fluxy", "[Fluxy] Alerta de seguridad: " + signal, html);
+    }
+
+    public void sendLifecycleNotice(String toEmail, String toName, String companyName, String title, String text) {
+        String html = securityLayout(title, text,
+                "<a href=\"" + escape(frontendUrl) + "/dashboard\" style=\"display:inline-block; margin-top:14px; background:#1769e0; color:#ffffff; padding:11px 20px; border-radius:10px; font-weight:600; font-size:14px; text-decoration:none;\">Ir a mi panel</a>",
+                "Recibís este aviso porque sos titular de " + escape(companyName) + " en Fluxy.");
+        send(toEmail, toName, title + " — " + companyName, html);
+    }
+
+    public void sendOwnershipTransferRequest(String toEmail, String toName, String companyName, String fromName) {
+        String html = securityLayout("Te proponen ser dueño de " + escape(companyName),
+                escape(fromName) + " quiere transferirte la propiedad del negocio. Vas a tener acceso total, incluida la facturación.",
+                "<a href=\"" + escape(frontendUrl) + "/dashboard/team\" style=\"display:inline-block; margin-top:14px; background:#1769e0; color:#ffffff; padding:11px 20px; border-radius:10px; font-weight:600; font-size:14px; text-decoration:none;\">Revisar y aceptar</a>",
+                "La propuesta vence en 72 horas.");
+        send(toEmail, toName, "Transferencia de propiedad de " + companyName, html);
+    }
+
+    @Value("${app.frontend_url:http://localhost:5173}")
+    private String frontendUrl;
+
+    private static String securityLayout(String title, String text, String extraHtml, String footer) {
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="UTF-8"></head>
+            <body style="margin:0; padding:0; background:#f7f9fc; font-family:'Segoe UI', Arial, sans-serif;">
+              <div style="max-width:520px; margin:40px auto; background:#ffffff; border:1px solid #e5eaf1; border-radius:14px; overflow:hidden;">
+                <div style="padding:24px 32px; border-bottom:1px solid #e5eaf1;">
+                  <div style="font-size:18px; font-weight:700; color:#0b172a;">Fluxy</div>
+                </div>
+                <div style="padding:26px 32px;">
+                  <p style="color:#0b172a; font-size:17px; font-weight:600; margin:0 0 10px;">%s</p>
+                  <p style="color:#526078; font-size:14px; line-height:1.6; margin:0;">%s</p>
+                  %s
+                  <p style="color:#7d8ba1; font-size:12px; line-height:1.6; margin:22px 0 0;">%s</p>
+                </div>
+              </div>
+            </body>
+            </html>
+        """.formatted(escape(title), text, extraHtml, footer);
     }
 
     // ─── Email de confirmación de pago y activación de plan ──────────────────
@@ -380,8 +510,7 @@ public class EmailService {
             </body>
             </html>
         """.formatted(escape(companyName), escape(inviterName), escape(roleLabel), acceptUrl);
-        send(toEmail, toEmail, "Te invitaron al equipo de " + companyName + " en Fluxy", html);
-        return true;
+        return send(toEmail, toEmail, "Te invitaron al equipo de " + companyName + " en Fluxy", html);
     }
 
     private static String escape(String value) {

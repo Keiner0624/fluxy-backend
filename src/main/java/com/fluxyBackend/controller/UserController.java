@@ -84,7 +84,10 @@ public class UserController {
                 expiresAt,
                 hasUsedTrial,
                 role,
-                permissions
+                permissions,
+                user.isEmailVerified(),
+                user.hasPassword(),
+                user.getCompany() != null ? user.getCompany().getStatus().name() : null
         );
     }
 
@@ -153,6 +156,10 @@ public class UserController {
             LocalDateTime planExpiresAt,
             boolean trialUsed,
             String role,
-            java.util.Set<String> permissions
+            java.util.Set<String> permissions,
+            boolean emailVerified,
+            boolean hasPassword,
+            /* ACTIVE, INACTIVE, SUSPENDED, ARCHIVED o DELETION_PENDING: el panel muestra el aviso que corresponde. */
+            String companyStatus
     ) {}
 }

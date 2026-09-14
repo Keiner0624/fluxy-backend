@@ -88,7 +88,7 @@ class OpenApiIntegrationTest {
         JsonNode business = schemas.path("RegisterBussinesRequest");
         assertThat(business.path("properties").has("businesName")).isTrue();
         assertThat(business.path("properties").has("whatssapp")).isTrue();
-        assertThat(business.path("properties").path("password").path("minLength").asInt()).isEqualTo(8);
+        assertThat(business.path("properties").path("password").path("minLength").asInt()).isEqualTo(10);
         assertThat(business.path("properties").path("password").path("maxLength").asInt()).isEqualTo(72);
         assertThat(schemas.path("OrderItemsRequest").path("properties").path("quantity")
                 .path("maximum").asInt()).isEqualTo(1000);
@@ -98,11 +98,11 @@ class OpenApiIntegrationTest {
 
     @Test
     void exposingDocumentationDoesNotOpenBusinessEndpoints() throws Exception {
-        mockMvc.perform(get("/products")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/products")).andExpect(status().isUnauthorized());
         mockMvc.perform(post("/payments/create-preference")
                         .contentType("application/json").content("{}"))
-                .andExpect(status().isForbidden());
-        mockMvc.perform(get("/admin/metrics")).andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/admin/metrics")).andExpect(status().isUnauthorized());
     }
 
     private JsonNode specification() throws Exception {

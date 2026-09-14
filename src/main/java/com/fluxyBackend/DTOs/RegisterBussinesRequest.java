@@ -42,8 +42,8 @@ public class RegisterBussinesRequest {
     @Schema(description = "Correo del propietario.", example = "cliente@example.com")
     public String email;
     @NotBlank
-    @Size(min = 8, max = 72)
-    @Schema(description = "Contraseña de 8 a 72 caracteres.", example = "MiClave123!", format = "password")
+    @Size(min = 10, max = 72)
+    @Schema(description = "Contraseña de 10 a 72 caracteres.", example = "MiClave123!", format = "password")
     public String password;
 
     @AssertTrue(message = "La contraseña no puede superar 72 bytes UTF-8")

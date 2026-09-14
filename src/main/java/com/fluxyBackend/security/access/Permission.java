@@ -18,7 +18,9 @@ public enum Permission {
     TEAM_VIEW, TEAM_INVITE, TEAM_MANAGE,
     INTEGRATION_VIEW, INTEGRATION_MANAGE,
     /** Configuración, estilo y dominio de la tienda. */
-    STORE_MANAGE,
+    SETTINGS_MANAGE,
+    /** Registro de actividad del negocio. */
+    AUDIT_VIEW,
     /** Plan y facturación: solo el dueño. */
     BILLING_MANAGE;
 
@@ -31,7 +33,9 @@ public enum Permission {
         Set<Permission> result = EnumSet.noneOf(Permission.class);
         for (String part : csv.split(",")) {
             String name = part.trim();
-            Arrays.stream(values()).filter(p -> p.name().equals(name)).findFirst().ifPresent(result::add);
+            // STORE_MANAGE es el nombre anterior de SETTINGS_MANAGE.
+            String canonical = "STORE_MANAGE".equals(name) ? "SETTINGS_MANAGE" : name;
+            Arrays.stream(values()).filter(p -> p.name().equals(canonical)).findFirst().ifPresent(result::add);
         }
         return result;
     }

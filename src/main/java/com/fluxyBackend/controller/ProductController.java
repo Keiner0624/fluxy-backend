@@ -25,6 +25,7 @@ import java.util.List;
 public class ProductController {
     private final ProductService prodcutService;
     private final AccessService accessService;
+    private final com.fluxyBackend.service.AuditService auditService;
 
     @Operation(summary = "Crear un producto",
             description = "Asocia el producto a la empresa del usuario. Responde 403 cuando se alcanza el límite del plan.")
@@ -91,7 +92,11 @@ public class ProductController {
     @PostMapping("/bulk")
     @RequirePermission(value = {Permission.PRODUCT_UPDATE, Permission.PRODUCT_DELETE}, any = true)
     public ProductService.BulkResult bulk(@RequestBody ProductService.BulkRequest request) {
-        return prodcutService.bulk(request, accessService.current(), accessService);
+        com.fluxyBackend.security.access.Member member = accessService.current();
+        ProductService.BulkResult result = prodcutService.bulk(request, member, accessService);
+        auditService.record(member, com.fluxyBackend.service.AuditAction.PRODUCTS_BULK_CHANGED, "PRODUCT", null,
+                java.util.Map.of("updated", result.updated(), "deleted", result.deleted()));
+        return result;
     }
 
     @Operation(summary = "Eliminar un producto",
@@ -99,6 +104,8 @@ public class ProductController {
     @DeleteMapping("/{id}")
     @RequirePermission(Permission.PRODUCT_DELETE)
     public void delete(@PathVariable Long id) {
-        prodcutService.delete(id, accessService.current());
+        com.fluxyBackend.security.access.Member member = accessService.current();
+        prodcutService.delete(id, member);
+        auditService.record(member, com.fluxyBackend.service.AuditAction.PRODUCT_DELETED, "PRODUCT", id, null);
     }
 }

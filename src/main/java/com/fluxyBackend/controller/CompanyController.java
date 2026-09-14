@@ -37,6 +37,8 @@ public class CompanyController {
     private final UserRepository     userRepository;
     private final CompanyRepository  companyRepository;
     private final EmailService       emailService;
+    private final com.fluxyBackend.security.access.AccessService accessService;
+    private final com.fluxyBackend.service.AuditService auditService;
 
     // ─── Crear empresa ───────────────────────────────────────────────────────
     @Operation(summary = "Crear una empresa",
@@ -58,33 +60,50 @@ public class CompanyController {
     @Operation(summary = "Actualizar la configuración de mi tienda",
             description = "Permite actualizar name, description, phone, address, email, logoUrl, storeStyle, primaryColor y paymentMethods.")
     @PutMapping("/config")
-    @RequirePermission(Permission.STORE_MANAGE)
-    public Company updateConfig(@RequestBody Company config, Authentication authentication) {
-        User user = userRepository.findByEmailIgnoreCase(authentication.getName())
-                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
-        Company company = user.getCompany();
+    @RequirePermission(Permission.SETTINGS_MANAGE)
+    public Company updateConfig(@jakarta.validation.Valid @RequestBody CompanyConfigRequest config) {
+        com.fluxyBackend.security.access.Member member = accessService.current();
+        Company company = companyRepository.findById(member.companyId())
+                .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
 
-        if (config.getName() != null && !config.getName().isBlank())
-            company.setName(config.getName());
-        if (config.getDescription() != null)
-            company.setDescription(config.getDescription());
-        if (config.getPhone() != null)
-            company.setPhone(config.getPhone());
-        if (config.getAddress() != null)
-            company.setAddress(config.getAddress());
-        if (config.getEmail() != null)
-            company.setEmail(config.getEmail());
-        if (config.getLogoUrl() != null)
-            company.setLogoUrl(config.getLogoUrl());
-        if (config.getStoreStyle() != null)
-            company.setStoreStyle(config.getStoreStyle());
-        if (config.getPrimaryColor() != null)
-            company.setPrimaryColor(config.getPrimaryColor());
-        if (config.getPaymentMethods() != null)
-            company.setPaymentMethods(config.getPaymentMethods());
+        // Solo estos campos: plan, slug, dominio y estado nunca se toman del cliente.
+        if (config.name() != null && !config.name().isBlank())
+            company.setName(config.name().strip());
+        if (config.description() != null)
+            company.setDescription(config.description());
+        if (config.phone() != null)
+            company.setPhone(config.phone().strip());
+        if (config.address() != null)
+            company.setAddress(config.address());
+        if (config.email() != null)
+            company.setEmail(config.email().strip());
+        if (config.logoUrl() != null)
+            company.setLogoUrl(config.logoUrl().isBlank() ? null : config.logoUrl().strip());
+        if (config.storeStyle() != null)
+            company.setStoreStyle(config.storeStyle());
+        if (config.primaryColor() != null)
+            company.setPrimaryColor(config.primaryColor());
+        if (config.paymentMethods() != null)
+            company.setPaymentMethods(config.paymentMethods());
 
-        return companyRepository.save(company);
+        Company saved = companyRepository.save(company);
+        auditService.record(member, com.fluxyBackend.service.AuditAction.SETTINGS_UPDATED, "COMPANY", company.getId(), null);
+        return saved;
     }
+
+    public record CompanyConfigRequest(
+            @jakarta.validation.constraints.Size(max = 120) String name,
+            @jakarta.validation.constraints.Size(max = 2000) String description,
+            @jakarta.validation.constraints.Size(max = 30) String phone,
+            @jakarta.validation.constraints.Size(max = 300) String address,
+            @jakarta.validation.constraints.Size(max = 254) @jakarta.validation.constraints.Email String email,
+            @jakarta.validation.constraints.Size(max = 2048)
+            @jakarta.validation.constraints.Pattern(regexp = "^$|^https://\\S+$", message = "debe ser una URL https")
+            String logoUrl,
+            @jakarta.validation.constraints.Size(max = 20000) String storeStyle,
+            @jakarta.validation.constraints.Pattern(regexp = "^$|^#[0-9A-Fa-f]{3,8}$", message = "debe ser un color hexadecimal")
+            String primaryColor,
+            @jakarta.validation.constraints.Size(max = 4000) String paymentMethods) {}
 
     // ─── Mi empresa ──────────────────────────────────────────────────────────
     @Operation(summary = "Consultar mi empresa",
@@ -131,6 +150,8 @@ public class CompanyController {
         company.setPlanExpiresAt(expiresAt);
         company.setTrialUsed(true);
         companyRepository.save(company);
+        auditService.record(company.getId(), user, com.fluxyBackend.service.AuditAction.PLAN_CHANGED, "COMPANY",
+                company.getId(), Map.of("from", "FREE", "to", "PRO", "by", "TRIAL"));
 
         // Enviar email de confirmación
         try {

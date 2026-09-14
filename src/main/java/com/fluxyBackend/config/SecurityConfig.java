@@ -58,6 +58,7 @@ public class SecurityConfig {
                         // Render lo consulta para saber si la instancia esta sana.
                         // El resto de /actuator/** queda cerrado por anyRequest().
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .requestMatchers("/payments/webhook").permitAll()
                         .requestMatchers("/coupons/validate").permitAll()
                         .requestMatchers(HttpMethod.GET, "/companies", "/companies/").hasRole("ADMIN")
@@ -68,9 +69,34 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .formLogin(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                // Sin token, vencido o de una sesión revocada: 401, para que el panel renueve la sesión.
+                // Con token válido pero sin permiso: 403.
+                .exceptionHandling(errors -> errors
+                        .authenticationEntryPoint((request, response, ex) -> writeError(response, 401, "UNAUTHENTICATED",
+                                "Tu sesión venció o no es válida. Iniciá sesión de nuevo."))
+                        .accessDeniedHandler((request, response, ex) -> writeError(response, 403, "FORBIDDEN",
+                                "No tenés acceso a este recurso.")))
+                .headers(headers -> headers
+                        .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
+                        .referrerPolicy(referrer -> referrer.policy(
+                                org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                        .frameOptions(frame -> frame.deny())
+                        .contentTypeOptions(Customizer.withDefaults())
+                        .permissionsPolicyHeader(policy -> policy.policy("camera=(), microphone=(), geolocation=()")))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    private static void writeError(jakarta.servlet.http.HttpServletResponse response, int status, String code, String message)
+            throws java.io.IOException {
+        response.setStatus(status);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        String requestId = com.fluxyBackend.security.ClientInfo.requestId();
+        response.getWriter().write("{\"status\":" + status + ",\"code\":\"" + code + "\",\"message\":\"" + message + "\""
+                + (requestId == null ? "" : ",\"requestId\":\"" + requestId + "\"") + "}");
     }
 
     @Bean
@@ -82,7 +108,8 @@ public class SecurityConfig {
                 .toList();
         configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Idempotency-Key", "X-Request-Id"));
+        configuration.setExposedHeaders(List.of("Retry-After", "X-Request-Id", "Idempotent-Replayed", "Content-Disposition"));
         configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

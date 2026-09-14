@@ -23,6 +23,7 @@ public class PaymentActivationService {
     private final UserRepository userRepository;
     private final ProcessedPaymentRepository processedPaymentRepository;
     private final PlanPricingService pricingService;
+    private final AuditService auditService;
 
     @Transactional
     public Optional<ActivationResult> activate(Payment payment) {
@@ -54,9 +55,24 @@ public class PaymentActivationService {
                 : now;
         LocalDateTime expiresAt = startsAt.plusMonths(reference.months());
 
+        Plan previous = company.getPlan();
         company.setPlan(reference.plan());
         company.setPlanActivatedAt(now);
         company.setPlanExpiresAt(expiresAt);
+        // Pagar reactiva una tienda frenada por inactividad; una eliminación pedida por el dueño se respeta.
+        if (company.getStatus() != Company.Status.ACTIVE && company.getStatus() != Company.Status.ANONYMIZED
+                && !"OWNER_REQUEST".equals(company.getSuspensionReason())) {
+            company.setStatus(Company.Status.ACTIVE);
+            company.setSuspensionReason(null);
+            company.setInactiveAt(null);
+            company.setSuspendedAt(null);
+            company.setArchivedAt(null);
+            company.setDeletionScheduledAt(null);
+        }
+        company.setLastBusinessActivityAt(now);
+        auditService.record(company.getId(), null, AuditAction.PLAN_CHANGED, "COMPANY", company.getId(),
+                java.util.Map.of("from", String.valueOf(previous), "to", reference.plan().name(),
+                        "months", reference.months(), "paymentId", String.valueOf(payment.getId())));
 
         User owner = userRepository.findFirstByCompanyIdAndRoleOrderByIdAsc(
                 company.getId(), com.fluxyBackend.entity.Role.BUSINESS_OWNER).orElse(null);

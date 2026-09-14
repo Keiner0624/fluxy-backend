@@ -32,6 +32,8 @@ class PaymentActivationServiceTest {
     private ProcessedPaymentRepository processedPaymentRepository;
     @Mock
     private Payment payment;
+    @Mock
+    private AuditService auditService;
 
     private PaymentActivationService service;
 
@@ -41,7 +43,8 @@ class PaymentActivationServiceTest {
                 companyRepository,
                 userRepository,
                 processedPaymentRepository,
-                new PlanPricingService()
+                new PlanPricingService(),
+                auditService
         );
     }
 

@@ -56,4 +56,28 @@ public class TeamController {
                                          @RequestBody TeamService.UpdateMemberRequest request) {
         return teamService.updateMember(accessService.current(), userId, request);
     }
+
+    public record TransferRequest(Long userId) {}
+
+    @Operation(summary = "Proponer transferencia de propiedad",
+            description = "Solo el dueño, con identidad confirmada hace menos de 10 minutos (403 REAUTH_REQUIRED). "
+                    + "El destinatario tiene que ser administrador activo y aceptar desde su cuenta en 72 horas.")
+    @PostMapping("/ownership-transfer")
+    public TeamService.TransferView startTransfer(@RequestBody TransferRequest request) {
+        return teamService.startTransfer(accessService.current(), request.userId(), accessService.currentSessionId());
+    }
+
+    @Operation(summary = "Aceptar la propiedad", description = "El destinatario pasa a dueño y el dueño anterior a administrador.")
+    @PostMapping("/ownership-transfer/accept")
+    public Map<String, String> acceptTransfer() {
+        teamService.acceptTransfer(accessService.current(), accessService.currentSessionId());
+        return Map.of("message", "Ahora sos el dueño del negocio.");
+    }
+
+    @Operation(summary = "Cancelar la transferencia", description = "La puede cancelar quien la propuso o quien la recibió.")
+    @DeleteMapping("/ownership-transfer")
+    public Map<String, String> cancelTransfer() {
+        teamService.cancelTransfer(accessService.current());
+        return Map.of("message", "Transferencia cancelada.");
+    }
 }

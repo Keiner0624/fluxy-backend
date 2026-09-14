@@ -21,6 +21,7 @@ public class PlanExpirationScheduler {
     private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
+    private final com.fluxyBackend.service.AuditService auditService;
 
     //Correr cada dia a las 00:00
     @Scheduled(cron = "0 0 0 * * *")
@@ -38,6 +39,8 @@ public class PlanExpirationScheduler {
             company.setPlanActivatedAt(null);
             company.setPlanExpiresAt(null);
             companyRepository.save(company);
+            auditService.record(company.getId(), null, com.fluxyBackend.service.AuditAction.PLAN_CHANGED, "COMPANY",
+                    company.getId(), java.util.Map.of("from", oldPlan, "to", "FREE", "by", "EXPIRATION"));
 
             log.info("Plan {} -> FREE para empresa {}", oldPlan, company.getName());
 

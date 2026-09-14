@@ -1,5 +1,6 @@
 package com.fluxyBackend.security;
 
+import com.fluxyBackend.entity.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.DecodingException;
@@ -10,14 +11,24 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.time.Duration;
 import java.util.Date;
-import java.util.Map;
 
+/**
+ * Firma y lee los access tokens.
+ *
+ * El access token dura 15 minutos y lleva el id de la sesión: si la sesión se
+ * revoca, el token deja de servir aunque no haya vencido. La sesión larga la
+ * sostiene el refresh token, que se guarda como hash y rota en cada uso.
+ */
 @Service
 public class JwtService {
 
     /** Mínimo que exige HS256. Una clave más corta debilita la firma. */
     private static final int MIN_KEY_BYTES = 32;
+
+    public static final String TYPE_ACCESS = "access";
+    public static final String TYPE_ADMIN = "admin";
 
     private static final String COMO_GENERARLA = """
             Generá una y definila como variable de entorno JWT_SECRET
@@ -34,14 +45,20 @@ public class JwtService {
 
             No la agregues a application.properties: ese archivo va al repositorio.""";
 
+    public record TokenClaims(String subject, Long userId, String sessionId, String type) {}
+
     @Value("${jwt.secret:}")
     private String secretKey;
 
-    @Value("${jwt.expiration}")
-    private long jwtExpiration;
+    @Value("${jwt.access_ttl_minutes:15}")
+    private long accessTtlMinutes = 15;
+
+    @Value("${jwt.admin_ttl_minutes:120}")
+    private long adminTtlMinutes = 120;
 
     /** Se construye una sola vez al arrancar, no en cada token. */
     private SecretKey signInKey;
+    private byte[] keyBytes;
 
     /**
      * Valida la clave al arrancar, en lugar de fallar al firmar el primer token.
@@ -58,7 +75,6 @@ public class JwtService {
                             + COMO_GENERARLA);
         }
 
-        byte[] keyBytes;
         try {
             keyBytes = Decoders.BASE64.decode(secretKey.trim());
         } catch (DecodingException e) {
@@ -75,11 +91,14 @@ public class JwtService {
         this.signInKey = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateToken(String email) {
+    public String generateAccessToken(User user, String sessionId) {
         return Jwts.builder()
-                .subject(email)
+                .subject(user.getEmail())
+                .claim("uid", user.getId())
+                .claim("sid", sessionId)
+                .claim("typ", TYPE_ACCESS)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .expiration(new Date(System.currentTimeMillis() + accessTtl().toMillis()))
                 .signWith(signInKey)
                 .compact();
     }
@@ -87,42 +106,37 @@ public class JwtService {
     public String generateAdminToken(String email) {
         return Jwts.builder()
                 .subject(email)
-                .claims(Map.of("role", "ADMIN"))
+                .claim("typ", TYPE_ADMIN)
+                .claim("role", "ADMIN")
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .expiration(new Date(System.currentTimeMillis() + Duration.ofMinutes(adminTtlMinutes).toMillis()))
                 .signWith(signInKey)
                 .compact();
     }
 
-    public boolean isAdminToken(String token) {
-        try {
-            Claims claims = extractAllClaims(token);
-            return "ADMIN".equals(claims.get("role", String.class));
-        } catch (Exception e) {
-            return false;
-        }
+    public Duration accessTtl() {
+        return Duration.ofMinutes(accessTtlMinutes);
     }
 
-    public String extractUsername(String token) {
-        return extractAllClaims(token).getSubject();
-    }
-
-    public boolean isTokenValid(String token, String email) {
-        final String username = extractUsername(token);
-        return username != null && email != null
-                && username.equalsIgnoreCase(email)
-                && !isTokenExpired(token);
-    }
-
-    private boolean isTokenExpired(String token) {
-        return extractAllClaims(token).getExpiration().before(new Date());
-    }
-
-    private Claims extractAllClaims(String token) {
-        return Jwts.parser()
+    /**
+     * Valida firma y vencimiento. Lanza JwtException si el token no sirve.
+     */
+    public TokenClaims parse(String token) {
+        Claims claims = Jwts.parser()
                 .verifyWith(signInKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+        Number uid = claims.get("uid", Number.class);
+        return new TokenClaims(claims.getSubject(), uid == null ? null : uid.longValue(),
+                claims.get("sid", String.class), claims.get("typ", String.class));
+    }
+
+    /**
+     * Clave derivada para otro propósito (por ejemplo, el HMAC de los códigos de
+     * verificación), sin reutilizar la clave de firma tal cual.
+     */
+    public byte[] derivedKey(String purpose) {
+        return java.util.HexFormat.of().parseHex(Hashing.hmacSha256(keyBytes, "fluxy:" + purpose));
     }
 }

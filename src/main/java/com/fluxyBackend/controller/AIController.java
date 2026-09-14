@@ -93,9 +93,10 @@ public class AIController {
 
             String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + geminiApiKey;
 
-            HttpClient client = HttpClient.newHttpClient();
+            HttpClient client = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(5)).build();
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
+                    .timeout(java.time.Duration.ofSeconds(20))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .build();
@@ -117,7 +118,8 @@ public class AIController {
 
         } catch (Exception e) {
             System.err.println("Error en AIController: " + e.getMessage());
-            return ResponseEntity.status(500).body(Map.of("message", "Error interno: " + e.getMessage()));
+            // El detalle queda en el log; al cliente no se le exponen errores internos.
+            return ResponseEntity.status(502).body(Map.of("message", "No se pudo generar la descripción. Intentá de nuevo."));
         }
     }
 

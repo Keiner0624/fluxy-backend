@@ -1,15 +1,16 @@
 package com.fluxyBackend.security;
 
+import com.fluxyBackend.entity.User;
+import com.fluxyBackend.repository.UserRepository;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,14 +22,23 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * Autentica con el access token.
+ *
+ * Además de firma y vencimiento, exige que la sesión del token siga activa: un
+ * token de una sesión cerrada o revocada no sirve aunque no haya vencido. Los
+ * tokens anteriores a las sesiones (sin sid) ya no se aceptan.
+ */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+    public static final String REQUEST_USER = "fluxy.user";
 
     private final JwtService jwtService;
-    private final CustomUserDetailsService userDetailsService;
+    private final SessionService sessionService;
+    private final UserRepository userRepository;
 
     @Value("${admin.email:}")
     private String adminEmail;
@@ -56,46 +66,41 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         final String jwt = authHeader.substring(7).trim();
-        if (jwt.isBlank() || !jwt.contains(".")) {
+        if (jwt.isBlank() || !jwt.contains(".") || SecurityContextHolder.getContext().getAuthentication() != null) {
             filterChain.doFilter(request, response);
             return;
         }
 
         try {
-            String userEmail = jwtService.extractUsername(jwt);
+            JwtService.TokenClaims claims = jwtService.parse(jwt);
 
-            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-
+            if (JwtService.TYPE_ADMIN.equals(claims.type())) {
                 // ─── Token de admin (sin cuenta en BD) ───────────────────────
-                if (!adminEmail.isBlank() && userEmail.equalsIgnoreCase(adminEmail.trim())
-                        && jwtService.isAdminToken(jwt)) {
-
-                    UsernamePasswordAuthenticationToken authToken =
-                            new UsernamePasswordAuthenticationToken(
-                                    userEmail, null,
-                                    List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
-                            );
-                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
-
-                } else {
-                    // ─── Token normal de vendedor ─────────────────────────────
-                    UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
-                    if (jwtService.isTokenValid(jwt, userDetails.getUsername())) {
-                        UsernamePasswordAuthenticationToken authToken =
-                                new UsernamePasswordAuthenticationToken(
-                                        userDetails, null,
-                                        userDetails.getAuthorities()
-                                );
-                        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                        SecurityContextHolder.getContext().setAuthentication(authToken);
-                    }
+                if (!adminEmail.isBlank() && adminEmail.trim().equalsIgnoreCase(claims.subject())) {
+                    authenticate(request, claims.subject(), List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+                }
+            } else if (JwtService.TYPE_ACCESS.equals(claims.type()) && claims.sessionId() != null
+                    && claims.userId() != null && sessionService.isActive(claims.sessionId(), claims.userId())) {
+                // ─── Token de vendedor con sesión activa ──────────────────────
+                User user = userRepository.findById(claims.userId()).orElse(null);
+                if (user != null && user.getStatus() == User.Status.ACTIVE) {
+                    UserDetails details = CustomUserDetailsService.toUserDetails(user);
+                    authenticate(request, details, details.getAuthorities());
+                    request.setAttribute(SessionService.REQUEST_SESSION_ID, claims.sessionId());
+                    request.setAttribute(REQUEST_USER, user);
                 }
             }
-        } catch (JwtException | IllegalArgumentException | AuthenticationException ex) {
-            log.debug("Invalid JWT: {}", ex.getMessage());
+        } catch (JwtException | IllegalArgumentException ex) {
+            log.debug("JWT inválido: {}", ex.getMessage());
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private static void authenticate(HttpServletRequest request, Object principal,
+                                     java.util.Collection<? extends org.springframework.security.core.GrantedAuthority> authorities) {
+        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(principal, null, authorities);
+        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        SecurityContextHolder.getContext().setAuthentication(authToken);
     }
 }

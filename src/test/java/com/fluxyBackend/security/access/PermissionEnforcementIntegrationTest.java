@@ -2,7 +2,8 @@ package com.fluxyBackend.security.access;
 
 import com.fluxyBackend.entity.*;
 import com.fluxyBackend.repository.*;
-import com.fluxyBackend.security.JwtService;
+import com.fluxyBackend.security.SessionService;
+import com.fluxyBackend.support.TestAuth;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PermissionEnforcementIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
-    @Autowired private JwtService jwtService;
+    @Autowired private SessionService sessionService;
     @Autowired private CompanyRepository companyRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private ProductRepository productRepository;
@@ -51,7 +52,7 @@ class PermissionEnforcementIntegrationTest {
     }
 
     private String bearer(User user) {
-        return "Bearer " + jwtService.generateToken(user.getEmail());
+        return TestAuth.bearer(sessionService, user);
     }
 
     @Test

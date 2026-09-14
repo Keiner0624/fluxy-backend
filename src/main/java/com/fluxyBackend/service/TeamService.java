@@ -1,17 +1,23 @@
 package com.fluxyBackend.service;
 
+import com.fluxyBackend.controller.AuthResponse;
 import com.fluxyBackend.entity.*;
 import com.fluxyBackend.exception.BusinessException;
+import com.fluxyBackend.exception.ForbiddenException;
 import com.fluxyBackend.exception.NotFoundException;
 import com.fluxyBackend.repository.CompanyRepository;
 import com.fluxyBackend.repository.MembershipRepository;
+import com.fluxyBackend.repository.OwnershipTransferRepository;
 import com.fluxyBackend.repository.TeamInvitationRepository;
 import com.fluxyBackend.repository.UserRepository;
-import com.fluxyBackend.security.JwtService;
+import com.fluxyBackend.security.Hashing;
+import com.fluxyBackend.security.PasswordPolicy;
+import com.fluxyBackend.security.SessionService;
 import com.fluxyBackend.security.access.AccessService;
 import com.fluxyBackend.security.access.Member;
 import com.fluxyBackend.security.access.MemberRole;
 import com.fluxyBackend.security.access.Permission;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,13 +26,12 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -36,16 +41,19 @@ import java.util.stream.Collectors;
 public class TeamService {
 
     private static final Duration INVITATION_TTL = Duration.ofDays(7);
-    private static final Set<MemberRole> ASSIGNABLE = EnumSet.of(MemberRole.ADMIN, MemberRole.SELLER, MemberRole.VIEWER);
-    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final Duration TRANSFER_TTL = Duration.ofHours(72);
+    private static final Set<MemberRole> ASSIGNABLE = EnumSet.of(
+            MemberRole.ADMIN, MemberRole.MANAGER, MemberRole.SELLER, MemberRole.WAREHOUSE, MemberRole.VIEWER);
 
     private final MembershipRepository membershipRepository;
     private final TeamInvitationRepository invitationRepository;
+    private final OwnershipTransferRepository transferRepository;
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
     private final BCryptPasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
+    private final SessionService sessionService;
     private final EmailService emailService;
+    private final AuditService auditService;
 
     @Value("${app.frontend_url:http://localhost:5173}")
     private String frontendUrl;
@@ -58,8 +66,12 @@ public class TeamService {
     public record InvitationView(Long id, String email, String role, List<String> permissions, String status,
                                  Instant expiresAt, Instant createdAt) {}
 
+    public record TransferView(Long id, Long fromUserId, String fromName, Long toUserId, String toName,
+                               OffsetDateTime createdAt, OffsetDateTime expiresAt, boolean incoming) {}
+
     public record Team(List<MemberView> members, List<InvitationView> invitations,
-                       Map<String, List<String>> roleDefaults, List<String> allPermissions) {}
+                       Map<String, List<String>> roleDefaults, List<String> allPermissions,
+                       TransferView pendingTransfer) {}
 
     public record InviteRequest(String email, String role, List<String> permissions) {}
 
@@ -70,8 +82,6 @@ public class TeamService {
     public record InvitationInfo(String companyName, String email, String role, boolean valid, String reason) {}
 
     public record AcceptRequest(String fullName, String password) {}
-
-    public record AcceptResult(String token) {}
 
     // ─── Consultas ────────────────────────────────────────────────────────────
 
@@ -98,7 +108,8 @@ public class TeamService {
             defaults.put(role.name(), List.copyOf(Permission.names(AccessService.effectivePermissions(role, null))));
         }
         return new Team(members, invitations, defaults,
-                Arrays.stream(Permission.values()).map(Enum::name).toList());
+                Arrays.stream(Permission.values()).map(Enum::name).toList(),
+                pendingTransfer(companyId, actor.user().getId(), users));
     }
 
     // ─── Invitaciones ─────────────────────────────────────────────────────────
@@ -119,16 +130,19 @@ public class TeamService {
                 .filter(i -> i.getAcceptedAt() == null && i.getRevokedAt() == null)
                 .forEach(i -> i.setRevokedAt(Instant.now()));
 
-        String token = newToken();
+        String token = Hashing.randomToken();
         TeamInvitation invitation = new TeamInvitation();
         invitation.setCompanyId(actor.companyId());
         invitation.setEmail(email);
         invitation.setRole(role.name());
         invitation.setPermissions(permissions == null ? null : Permission.format(permissions));
-        invitation.setTokenHash(sha256(token));
+        invitation.setTokenHash(Hashing.sha256(token));
         invitation.setExpiresAt(Instant.now().plus(INVITATION_TTL));
         invitation.setInvitedBy(actor.user().getId());
         invitationRepository.save(invitation);
+
+        auditService.record(actor, AuditAction.TEAM_INVITED, "INVITATION", invitation.getId(),
+                Map.of("email", email, "role", role.name(), "customPermissions", permissions != null));
 
         String acceptUrl = frontendUrl.replaceAll("/$", "") + "/invite/" + token;
         boolean emailSent = emailService.sendTeamInvitationEmail(email, actor.company().getName(),
@@ -142,10 +156,12 @@ public class TeamService {
                 .orElseThrow(() -> new NotFoundException("Invitación no encontrada"));
         if (invitation.getAcceptedAt() != null) throw new BusinessException("La invitación ya fue aceptada.");
         invitation.setRevokedAt(Instant.now());
+        auditService.record(actor, AuditAction.TEAM_INVITE_REVOKED, "INVITATION", invitationId,
+                Map.of("email", invitation.getEmail()));
     }
 
     public InvitationInfo invitationInfo(String token) {
-        Optional<TeamInvitation> found = invitationRepository.findByTokenHash(sha256(token));
+        Optional<TeamInvitation> found = invitationRepository.findByTokenHash(Hashing.sha256(token));
         if (found.isEmpty()) return new InvitationInfo(null, null, null, false, "NOT_FOUND");
         TeamInvitation invitation = found.get();
         String company = companyRepository.findById(invitation.getCompanyId()).map(Company::getName).orElse(null);
@@ -157,17 +173,14 @@ public class TeamService {
     }
 
     @Transactional
-    public AcceptResult accept(String token, AcceptRequest request) {
-        TeamInvitation invitation = invitationRepository.findByTokenHash(sha256(token))
+    public AuthResponse accept(String token, AcceptRequest request, HttpServletRequest http) {
+        TeamInvitation invitation = invitationRepository.findByTokenHash(Hashing.sha256(token))
                 .filter(TeamInvitation::isPending)
                 .orElseThrow(() -> new BusinessException(HttpStatus.GONE, "INVITATION_INVALID",
                         "La invitación no es válida o ya venció. Pedile a quien te invitó que la reenvíe."));
         String fullName = request.fullName() == null ? "" : request.fullName().strip().replaceAll("\\s+", " ");
         if (fullName.length() < 2 || fullName.length() > 150) throw new BusinessException("Ingresá tu nombre completo.");
-        String password = request.password() == null ? "" : request.password();
-        if (password.length() < 8 || password.length() > 72) {
-            throw new BusinessException("La contraseña tiene que tener entre 8 y 72 caracteres.");
-        }
+        PasswordPolicy.validate(request.password(), invitation.getEmail());
         if (userRepository.existsByEmailIgnoreCase(invitation.getEmail())) {
             throw BusinessException.conflict("EMAIL_HAS_ACCOUNT", "Ese correo ya tiene una cuenta. Iniciá sesión.");
         }
@@ -178,8 +191,11 @@ public class TeamService {
                 .fullName(fullName)
                 .firstName(fullName.split(" ", 2)[0])
                 .email(invitation.getEmail())
-                .password(passwordEncoder.encode(password))
+                .password(passwordEncoder.encode(request.password()))
+                .passwordEnabled(true)
+                .passwordChangedAt(LocalDateTime.now())
                 .role(Role.TEAM_MEMBER)
+                .status(User.Status.ACTIVE)
                 .company(company)
                 .build());
         Membership membership = new Membership(user.getId(), company.getId(), invitation.getRole());
@@ -187,7 +203,10 @@ public class TeamService {
         membership.setInvitedBy(invitation.getInvitedBy());
         membershipRepository.save(membership);
         invitation.setAcceptedAt(Instant.now());
-        return new AcceptResult(jwtService.generateToken(user.getEmail()));
+
+        auditService.record(company.getId(), user, AuditAction.TEAM_MEMBER_JOINED, "USER", user.getId(),
+                Map.of("role", invitation.getRole()));
+        return sessionService.create(user, UserSession.AuthMethod.INVITATION, false, http);
     }
 
     // ─── Miembros ─────────────────────────────────────────────────────────────
@@ -200,30 +219,139 @@ public class TeamService {
         Membership membership = membershipRepository.findByUserIdAndCompanyId(userId, actor.companyId())
                 .orElseThrow(() -> new NotFoundException("Esa persona no es parte de tu equipo."));
         MemberRole current = MemberRole.parse(membership.getRole());
-        if (current == MemberRole.OWNER) throw new BusinessException("No se puede modificar al dueño del negocio.");
+        if (current == MemberRole.OWNER) {
+            throw new BusinessException("No se puede modificar al dueño. Para cambiarlo, usá la transferencia de propiedad.");
+        }
         ensureCanAssign(actor, current);
 
+        Map<String, Object> changes = new LinkedHashMap<>();
         if (request.role() != null) {
             MemberRole role = assignableRole(request.role());
             ensureCanAssign(actor, role);
+            if (role != current) changes.put("role", current.name() + " → " + role.name());
             membership.setRole(role.name());
         }
         if (Boolean.TRUE.equals(request.useRoleDefaults())) {
+            if (membership.getPermissions() != null) changes.put("permissions", "del rol");
             membership.setPermissions(null);
         } else if (request.permissions() != null) {
-            membership.setPermissions(Permission.format(grantable(actor, request.permissions())));
+            String formatted = Permission.format(grantable(actor, request.permissions()));
+            if (!formatted.equals(membership.getPermissions())) changes.put("permissions", formatted);
+            membership.setPermissions(formatted);
         }
+        boolean disabled = false;
         if (request.status() != null) {
             String status = request.status().strip().toUpperCase(Locale.ROOT);
             if (!Membership.STATUS_ACTIVE.equals(status) && !Membership.STATUS_DISABLED.equals(status)) {
                 throw new BusinessException("El estado tiene que ser ACTIVE o DISABLED.");
             }
+            if (!status.equals(membership.getStatus())) changes.put("status", status);
+            disabled = Membership.STATUS_DISABLED.equals(status) && membership.isActive();
             membership.setStatus(status);
         }
         membership.setUpdatedAt(Instant.now());
         membershipRepository.save(membership);
+        // Desactivar cierra también sus sesiones abiertas.
+        if (disabled) sessionService.revokeAllForUser(userId, null, "ACCESS_DISABLED");
+        if (!changes.isEmpty()) {
+            auditService.record(actor, AuditAction.TEAM_MEMBER_UPDATED, "USER", userId, changes);
+        }
         User user = userRepository.findById(userId).orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
         return memberView(membership, user, actor);
+    }
+
+    // ─── Transferencia de propiedad ───────────────────────────────────────────
+
+    /** El dueño propone; la persona propuesta acepta desde su cuenta. Requiere identidad confirmada hace poco. */
+    @Transactional
+    public TransferView startTransfer(Member actor, Long toUserId, String sessionId) {
+        if (!actor.isOwner()) throw new ForbiddenException(ForbiddenException.OWNER_ONLY, "Solo el dueño puede transferir el negocio.");
+        sessionService.requireRecentAuth(sessionId, Duration.ofMinutes(10));
+        if (actor.user().getId().equals(toUserId)) throw new BusinessException("Ya sos el dueño.");
+        Membership target = membershipRepository.findByUserIdAndCompanyId(toUserId, actor.companyId())
+                .orElseThrow(() -> new NotFoundException("Esa persona no es parte de tu equipo."));
+        if (!target.isActive() || MemberRole.parse(target.getRole()) != MemberRole.ADMIN) {
+            throw new BusinessException("Solo se puede transferir a un administrador activo del equipo.");
+        }
+        transferRepository.findByCompanyIdOrderByCreatedAtDesc(actor.companyId()).stream()
+                .filter(OwnershipTransfer::isPending).forEach(t -> t.setCancelledAt(LocalDateTime.now()));
+
+        OwnershipTransfer transfer = new OwnershipTransfer();
+        transfer.setCompanyId(actor.companyId());
+        transfer.setFromUserId(actor.user().getId());
+        transfer.setToUserId(toUserId);
+        transfer.setCreatedAt(LocalDateTime.now());
+        transfer.setExpiresAt(LocalDateTime.now().plus(TRANSFER_TTL));
+        transferRepository.save(transfer);
+
+        User toUser = userRepository.findById(toUserId).orElseThrow();
+        auditService.record(actor, AuditAction.OWNERSHIP_TRANSFER_STARTED, "USER", toUserId, Map.of("to", toUser.getEmail()));
+        String companyName = actor.company().getName();
+        String fromName = actor.displayName();
+        CompletableFuture.runAsync(() -> emailService.sendOwnershipTransferRequest(toUser.getEmail(), toUser.getFullName(),
+                companyName, fromName));
+        return transferView(transfer, Map.of(actor.user().getId(), actor.user(), toUserId, toUser), actor.user().getId());
+    }
+
+    @Transactional
+    public void cancelTransfer(Member actor) {
+        OwnershipTransfer transfer = currentTransfer(actor.companyId())
+                .filter(t -> t.getFromUserId().equals(actor.user().getId()) || t.getToUserId().equals(actor.user().getId()))
+                .orElseThrow(() -> new NotFoundException("No hay una transferencia pendiente."));
+        transfer.setCancelledAt(LocalDateTime.now());
+        auditService.record(actor, AuditAction.OWNERSHIP_TRANSFER_CANCELLED, "USER", transfer.getToUserId(), null);
+    }
+
+    @Transactional
+    public void acceptTransfer(Member actor, String sessionId) {
+        sessionService.requireRecentAuth(sessionId, Duration.ofMinutes(10));
+        OwnershipTransfer transfer = currentTransfer(actor.companyId())
+                .filter(t -> t.getToUserId().equals(actor.user().getId()))
+                .orElseThrow(() -> new NotFoundException("No tenés una transferencia pendiente."));
+        Membership previousOwner = membershipRepository.findByUserIdAndCompanyId(transfer.getFromUserId(), actor.companyId())
+                .orElseThrow(() -> new BusinessException("El dueño actual ya no forma parte del negocio."));
+        if (MemberRole.parse(previousOwner.getRole()) != MemberRole.OWNER) {
+            throw new BusinessException("La transferencia ya no es válida.");
+        }
+        Membership newOwner = actor.membership();
+
+        previousOwner.setRole(MemberRole.ADMIN.name());
+        previousOwner.setPermissions(null);
+        newOwner.setRole(MemberRole.OWNER.name());
+        newOwner.setPermissions(null);
+        membershipRepository.save(previousOwner);
+        membershipRepository.save(newOwner);
+
+        // El rol de seguridad acompaña: avisos, cobros y facturación buscan al BUSINESS_OWNER.
+        userRepository.findById(transfer.getFromUserId()).ifPresent(u -> {
+            u.setRole(Role.TEAM_MEMBER);
+            userRepository.save(u);
+        });
+        User me = actor.user();
+        me.setRole(Role.BUSINESS_OWNER);
+        userRepository.save(me);
+
+        transfer.setAcceptedAt(LocalDateTime.now());
+        auditService.record(actor, AuditAction.OWNERSHIP_TRANSFERRED, "USER", me.getId(),
+                Map.of("fromUserId", transfer.getFromUserId()));
+    }
+
+    private Optional<OwnershipTransfer> currentTransfer(Long companyId) {
+        return transferRepository.findByCompanyIdOrderByCreatedAtDesc(companyId).stream()
+                .filter(OwnershipTransfer::isPending).findFirst();
+    }
+
+    private TransferView pendingTransfer(Long companyId, Long viewerId, Map<Long, User> users) {
+        return currentTransfer(companyId).map(t -> transferView(t, users, viewerId)).orElse(null);
+    }
+
+    private static TransferView transferView(OwnershipTransfer t, Map<Long, User> users, Long viewerId) {
+        User from = users.get(t.getFromUserId());
+        User to = users.get(t.getToUserId());
+        return new TransferView(t.getId(), t.getFromUserId(), from == null ? null : from.getFullName(),
+                t.getToUserId(), to == null ? null : to.getFullName(),
+                BusinessClock.withOffset(t.getCreatedAt()), BusinessClock.withOffset(t.getExpiresAt()),
+                t.getToUserId().equals(viewerId));
     }
 
     // ─── Apoyo ────────────────────────────────────────────────────────────────
@@ -256,7 +384,7 @@ public class TeamService {
         try {
             role = MemberRole.valueOf(value == null ? "" : value.strip().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            throw new BusinessException("Rol inválido. Usá ADMIN, SELLER o VIEWER.");
+            throw new BusinessException("Rol inválido. Usá ADMIN, MANAGER, SELLER, WAREHOUSE o VIEWER.");
         }
         if (!ASSIGNABLE.contains(role)) throw new BusinessException("Solo puede haber un dueño por negocio.");
         return role;
@@ -283,7 +411,9 @@ public class TeamService {
         return switch (role) {
             case OWNER -> "Dueño";
             case ADMIN -> "Administrador";
+            case MANAGER -> "Encargado";
             case SELLER -> "Vendedor";
+            case WAREHOUSE -> "Almacén";
             case VIEWER -> "Solo lectura";
         };
     }
@@ -294,21 +424,5 @@ public class TeamService {
             throw new BusinessException("Ingresá un correo válido.");
         }
         return value;
-    }
-
-    private static String newToken() {
-        byte[] bytes = new byte[32];
-        RANDOM.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
-
-    static String sha256(String value) {
-        try {
-            byte[] hash = MessageDigest.getInstance("SHA-256").digest(
-                    (value == null ? "" : value).getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
     }
 }

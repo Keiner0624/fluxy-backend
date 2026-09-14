@@ -34,6 +34,7 @@ public class CategoryController {
     private final CompanyRepository  companyRepository;
     private final ProductRepository  productRepository;
     private final AccessService      accessService;
+    private final com.fluxyBackend.service.AuditService auditService;
 
     public record CategoryView(Long id, String name, String emoji, String description, Integer sortOrder,
                                Boolean active, long productCount) {}
@@ -135,6 +136,7 @@ public class CategoryController {
         Category cat = find(id, member.company());
         int unassigned = productRepository.clearCategory(cat);
         categoryRepository.delete(cat);
+        auditService.record(member, com.fluxyBackend.service.AuditAction.CATEGORY_DELETED, "CATEGORY", id, Map.of("name", String.valueOf(cat.getName())));
         return Map.of("message", "Categoría eliminada.", "productsUnassigned", unassigned);
     }
 

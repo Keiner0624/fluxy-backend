@@ -23,9 +23,10 @@ public class InvitationController {
     }
 
     @Operation(summary = "Aceptar una invitación",
-            description = "Crea la cuenta con fullName y password (8 a 72 caracteres) y devuelve el token de sesión.")
+            description = "Crea la cuenta con fullName y password (10 a 72 caracteres) y abre la sesión.")
     @PostMapping("/{token}/accept")
-    public TeamService.AcceptResult accept(@PathVariable String token, @RequestBody TeamService.AcceptRequest request) {
-        return teamService.accept(token, request);
+    public AuthResponse accept(@PathVariable String token, @RequestBody TeamService.AcceptRequest request,
+                               jakarta.servlet.http.HttpServletRequest http) {
+        return teamService.accept(token, request, http);
     }
 }
