@@ -1,7 +1,7 @@
 # Build en dos etapas: se compila con Maven y se ejecuta solo con el JRE,
 # para que la imagen final no arrastre el JDK ni el repositorio de Maven.
 
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM maven:3-eclipse-temurin-26 AS build
 WORKDIR /build
 
 # Las dependencias se resuelven antes de copiar el código, así Docker
