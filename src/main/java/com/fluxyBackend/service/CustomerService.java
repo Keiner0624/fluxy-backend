@@ -132,6 +132,8 @@ public class CustomerService {
                 .distinct().sorted().toList();
     }
 
+    // Transaccional: los ítems de cada pedido se cargan en forma diferida.
+    @Transactional(readOnly = true)
     public CustomerDetail detail(Long companyId, Long customerId) {
         Customer customer = find(companyId, customerId);
         OrderRepository.CustomerStats stats = statsByCustomer(companyId).get(customerId);
@@ -139,7 +141,7 @@ public class CustomerService {
         long saleOrders = stats == null || stats.getSaleOrders() == null ? 0 : stats.getSaleOrders();
         double spent = stats == null || stats.getSpent() == null ? 0 : stats.getSpent();
 
-        List<CustomerOrder> recent = orderRepository.findByCompanyIdAndCustomerId(companyId, customerId,
+        List<CustomerOrder> recent = orderRepository.findByCompanyIdAndCustomer_Id(companyId, customerId,
                         PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt")))
                 .map(o -> new CustomerOrder(o.getId(), BusinessClock.withOffset(o.getCreatedAt()),
                         o.getStatus() == null ? null : o.getStatus().name(),

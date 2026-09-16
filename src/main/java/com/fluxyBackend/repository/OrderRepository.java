@@ -27,7 +27,7 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
     Optional<Order> findByIdAndCompanyId(Long id, Long companyId);
     List<Order> findByCompanyId(Long companyId);
     List<Order> findTop5ByCompanyIdOrderByCreatedAtDescIdDesc(Long companyId);
-    Page<Order> findByCompanyIdAndCustomerId(Long companyId, Long customerId, Pageable pageable);
+    Page<Order> findByCompanyIdAndCustomer_Id(Long companyId, Long customerId, Pageable pageable);
     long countByCompanyIdAndStatus(Long companyId, OrderStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

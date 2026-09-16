@@ -236,6 +236,15 @@ class SecurityBlueprintIntegrationTest {
         Prodcut untouched = productRepository.findById(b.product().getId()).orElseThrow();
         assertThat(untouched.getName()).isEqualTo("Café");
         assertThat(untouched.getStock()).isEqualTo(19);
+
+        // El dueño sí ve la ficha de su cliente, con sus pedidos.
+        mvc.perform(get("/customers/" + customerB).header("Authorization", b.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recentOrders[0].id").value(orderB));
+        mvc.perform(post("/customers").header("Authorization", b.token())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Cliente de mostrador\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recentOrders").isEmpty());
     }
 
     @Test
