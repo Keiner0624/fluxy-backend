@@ -50,6 +50,7 @@ Si el correo ya tiene cuenta, se vincula y entra solo cuando el proveedor garant
 | Recuperación de contraseña | 10/hora por IP y 3/hora por correo (silencioso) |
 | Reautenticación y cambios sensibles | 10 cada 15 min por usuario |
 | Exportación de datos | 5/hora por empresa |
+| Libro de Reclamaciones | 5 hojas/hora por IP |
 | Cuerpo de la petición | 1 MB (`413`) |
 
 Todas las respuestas 429 llevan `Retry-After`. Los límites son por instancia (en memoria); con más de una instancia hay que moverlos a Redis.
@@ -96,9 +97,18 @@ El dueño puede programar la eliminación (`POST /company-account/deletion`, ide
 | `OAUTH_GOOGLE_CLIENT_ID` | No | Client ID web de Google Cloud; origen autorizado = URL del frontend. |
 | `OAUTH_APPLE_CLIENT_ID`, `OAUTH_APPLE_REDIRECT_URI` | No | Services ID de Apple y la URL de retorno registrada. |
 | `SECURITY_ALERT_EMAIL` | Recomendada | Destino de las alertas. |
+| `LEGAL_PROVIDER_NAME`, `LEGAL_PROVIDER_TAX_ID`, `LEGAL_PROVIDER_ADDRESS` | Recomendada | Titular, RUC y domicilio que encabezan el Libro de Reclamaciones. Deben coincidir con `PROVIDER` en `src/modules/landing/legal/<versión>.js` del frontend. |
+| `COMPLAINTS_NOTIFY_EMAIL`, `COMPLAINTS_RESPONSE_BUSINESS_DAYS` | No | A quién avisar de cada hoja (por defecto soporte@fluxyweb.com) y plazo de respuesta en días hábiles (15). |
 | `JWT_ACCESS_TTL_MINUTES`, `SESSION_REMEMBER_DAYS`, `SESSION_DEFAULT_HOURS` | No | 15, 14 y 12 por defecto. |
 | `LIFECYCLE_*_DAYS`, `LIFECYCLE_PURGE_ENABLED` | No | Umbrales del ciclo de vida; purga apagada por defecto. |
 | `VERIFICATION_LOG_CODES` | Solo local | Escribe los códigos en el log. **Nunca en producción.** |
+
+## 7.1 Documentos legales y Libro de Reclamaciones
+
+- **Versiones:** `LegalAcceptance.TERMS_VERSION` debe ser igual a `CURRENT_LEGAL_VERSION` del frontend. Cada versión publicada es un archivo inmutable y las anteriores siguen visibles en `/terms`.
+- **Aceptación:** el registro guarda la versión, la fecha y la IP como hash. `GET /me/legal` indica si falta aceptar la vigente; el panel lo pide con un aviso que no se puede cerrar, y `POST /me/legal/accept` solo acepta la versión vigente (`409 LEGAL_VERSION_OUTDATED`). Queda en auditoría como `TERMS_ACCEPTED`.
+- **Libro de Reclamaciones:** `POST /complaints` (público) guarda la hoja con código `LR-AAAA-NNNNNN`, fecha límite de 15 días hábiles (sin contar sábados ni domingos) e IP como hash; envía copia al consumidor y aviso a `COMPLAINTS_NOTIFY_EMAIL`. `GET /admin/complaints` y `POST /admin/complaints/{id}/response` son solo para administración; la respuesta se envía por correo y no se puede reemplazar.
+- **Cookies:** el sitio carga Google Analytics solo con consentimiento (`fluxy_cookie_consent`); las tiendas no cargan la medición de Fluxy.
 
 ## 8. CI, dependencias y secretos
 

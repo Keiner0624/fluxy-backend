@@ -155,6 +155,72 @@ public class EmailService {
         send(toEmail, toName, "Transferencia de propiedad de " + companyName, html);
     }
 
+    // ─── Libro de Reclamaciones ──────────────────────────────────────────────
+
+    private static final java.time.format.DateTimeFormatter DAY = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final java.time.format.DateTimeFormatter DAY_TIME = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
+    /** Copia de la hoja para el consumidor: es su constancia. */
+    public void sendComplaintCopy(ComplaintService.ComplaintView c, ComplaintService.ProviderInfo provider) {
+        String html = securityLayout("Registramos tu " + kind(c) + " " + escape(c.code()),
+                "Esta es la copia de tu hoja del Libro de Reclamaciones de Fluxy. Te responderemos a este correo a más tardar el "
+                        + c.dueDate().format(DAY) + ".",
+                complaintTable(c, provider),
+                "Guardá este correo como constancia. Código: " + escape(c.code()) + ".");
+        send(c.email(), c.consumerName(), "Hoja de reclamación " + c.code() + " — Fluxy", html);
+    }
+
+    public void sendComplaintAlert(String toEmail, ComplaintService.ComplaintView c) {
+        String html = securityLayout("Nueva hoja " + escape(c.code()),
+                "Se registró un " + kind(c) + ". Hay que responder a más tardar el " + c.dueDate().format(DAY) + ".",
+                complaintTable(c, null)
+                        + "<a href=\"" + escape(frontendUrl) + "/admin\" style=\"display:inline-block; margin-top:14px; background:#1769e0; color:#ffffff; padding:11px 20px; border-radius:10px; font-weight:600; font-size:14px; text-decoration:none;\">Responder desde administración</a>",
+                "Aviso interno del Libro de Reclamaciones.");
+        send(toEmail, "Atención al cliente Fluxy", "[Fluxy] Libro de Reclamaciones: " + c.code(), html);
+    }
+
+    public void sendComplaintResponse(ComplaintService.ComplaintView c, ComplaintService.ProviderInfo provider) {
+        String html = securityLayout("Respuesta a tu hoja " + escape(c.code()),
+                "Hola " + escape(c.consumerName()) + ", esta es la respuesta de " + escape(provider.name())
+                        + " a tu hoja del Libro de Reclamaciones.",
+                "<div style=\"margin:14px 0; padding:14px 16px; border-radius:10px; background:#f3f6fb; color:#0b172a; font-size:14px; line-height:1.6; white-space:pre-line;\">"
+                        + escape(c.response()) + "</div>",
+                "Si tenés dudas sobre esta respuesta, respondé a este correo e indicá el código " + escape(c.code()) + ".");
+        send(c.email(), c.consumerName(), "Respuesta a tu hoja " + c.code() + " — Fluxy", html);
+    }
+
+    private static String kind(ComplaintService.ComplaintView c) {
+        return c.type() == com.fluxyBackend.entity.Complaint.Type.RECLAMO ? "reclamo" : "queja";
+    }
+
+    private static String complaintTable(ComplaintService.ComplaintView c, ComplaintService.ProviderInfo provider) {
+        StringBuilder rows = new StringBuilder();
+        if (provider != null) {
+            row(rows, "Proveedor", provider.name());
+            row(rows, "RUC", provider.taxId() == null ? "En trámite" : provider.taxId());
+            if (provider.address() != null) row(rows, "Domicilio del proveedor", provider.address());
+        }
+        row(rows, "Código", c.code());
+        row(rows, "Fecha", c.receivedAt().format(DAY_TIME));
+        row(rows, "Tipo", c.type() == com.fluxyBackend.entity.Complaint.Type.RECLAMO ? "Reclamo" : "Queja");
+        row(rows, "Consumidor", c.consumerName());
+        row(rows, "Documento", c.documentType() + " " + c.documentNumber());
+        row(rows, "Domicilio", c.address());
+        if (c.phone() != null) row(rows, "Teléfono", c.phone());
+        row(rows, "Correo", c.email());
+        if (c.minor()) row(rows, "Padre, madre o apoderado", c.guardianName());
+        row(rows, c.itemType() == com.fluxyBackend.entity.Complaint.ItemType.PRODUCTO ? "Producto" : "Servicio", c.itemDescription());
+        if (c.amount() != null) row(rows, "Monto reclamado", String.format(java.util.Locale.ROOT, "S/ %.2f", c.amount()));
+        row(rows, "Detalle", c.detail());
+        row(rows, "Pedido del consumidor", c.consumerRequest());
+        return "<table style=\"margin:14px 0; font-size:14px; color:#526078; border-collapse:collapse;\">" + rows + "</table>";
+    }
+
+    private static void row(StringBuilder rows, String label, String value) {
+        rows.append("<tr><td style=\"padding:4px 14px 4px 0; vertical-align:top; white-space:nowrap;\">").append(escape(label))
+                .append("</td><td style=\"padding:4px 0; color:#0b172a; white-space:pre-line;\">").append(escape(value)).append("</td></tr>");
+    }
+
     @Value("${app.frontend_url:http://localhost:5173}")
     private String frontendUrl;
 

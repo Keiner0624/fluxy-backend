@@ -36,7 +36,9 @@ public class RateLimitService {
         /** Exportación de datos del negocio, por empresa. */
         DATA_EXPORT(5, Duration.ofHours(1)),
         /** Reautenticación y cambios sensibles, por usuario. */
-        SENSITIVE(10, Duration.ofMinutes(15));
+        SENSITIVE(10, Duration.ofMinutes(15)),
+        /** Hojas del Libro de Reclamaciones, por IP. */
+        COMPLAINT(5, Duration.ofHours(1));
 
         final int limit;
         final Duration window;

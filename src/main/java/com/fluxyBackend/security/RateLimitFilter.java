@@ -49,7 +49,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     static RateLimitService.Bucket bucketFor(HttpServletRequest request) {
-        String path = request.getServletPath();
+        // La URI sin el contexto: igual en Tomcat y en MockMvc (donde getServletPath() llega vacío).
+        String path = request.getRequestURI().substring(request.getContextPath().length());
         String method = request.getMethod();
         if (path.startsWith("/store/")) {
             return "POST".equals(method) ? RateLimitService.Bucket.STORE_ORDER : RateLimitService.Bucket.STORE_READ;
@@ -59,6 +60,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return RateLimitService.Bucket.SIGNUP;
         }
         if (path.equals("/auth/refresh")) return RateLimitService.Bucket.REFRESH;
+        if (path.equals("/complaints")) return RateLimitService.Bucket.COMPLAINT;
         if (path.equals("/auth/forgot-password")) return RateLimitService.Bucket.PASSWORD_RESET_IP;
         return null;
     }

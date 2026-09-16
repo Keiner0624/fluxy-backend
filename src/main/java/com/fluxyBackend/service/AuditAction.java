@@ -26,6 +26,7 @@ public final class AuditAction {
     public static final String PASSWORD_RESET_COMPLETED = "PASSWORD_RESET_COMPLETED";
     public static final String IDENTITY_LINKED = "IDENTITY_LINKED";
     public static final String IDENTITY_UNLINKED = "IDENTITY_UNLINKED";
+    public static final String TERMS_ACCEPTED = "TERMS_ACCEPTED";
 
     // Equipo
     public static final String TEAM_INVITED = "TEAM_INVITED";

@@ -61,6 +61,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .requestMatchers("/payments/webhook").permitAll()
                         .requestMatchers("/coupons/validate").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/complaints/provider").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/complaints").permitAll()
                         .requestMatchers(HttpMethod.GET, "/companies", "/companies/").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/companies", "/companies/").hasRole("ADMIN")
                         .requestMatchers("/admin/**").hasRole("ADMIN")

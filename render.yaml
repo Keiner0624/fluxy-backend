@@ -99,6 +99,15 @@ services:
         sync: false
       - key: SECURITY_ALERT_EMAIL
         sync: false
+      # Titular del servicio en el Libro de Reclamaciones (RUC y domicilio apenas estén disponibles).
+      - key: LEGAL_PROVIDER_NAME
+        value: "Assemble S.A.C."
+      - key: LEGAL_PROVIDER_TAX_ID
+        sync: false
+      - key: LEGAL_PROVIDER_ADDRESS
+        sync: false
+      - key: COMPLAINTS_NOTIFY_EMAIL
+        value: "soporte@fluxyweb.com"
       # Anonimización definitiva de negocios eliminados: activar solo con backups verificados.
       - key: LIFECYCLE_PURGE_ENABLED
         value: "false"
