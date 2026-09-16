@@ -22,7 +22,7 @@ services:
     autoDeployTrigger: checksPass
 
     envVars:
-      # ── Base de datos ──────────────────────────────────────────────────
+      #  Base de datos
       # Render no permite componer cadenas, así que se pasan las piezas y
       # application.properties arma la URL JDBC.
       - key: DB_HOST
@@ -38,7 +38,7 @@ services:
       - key: HIBERNATE_DDL_AUTO
         value: update
 
-      # ── URLs públicas ──────────────────────────────────────────────────
+      #  URLs públicas
       - key: APP_FRONTEND_URL
         value: https://fluxyweb.vercel.app
       - key: APP_ALLOWED_ORIGINS
@@ -47,7 +47,7 @@ services:
       - key: APP_BACKEND_URL
         sync: false
 
-      # ── Secretos ───────────────────────────────────────────────────────
+      # Secretos
       # JWT_SECRET debe ser Base64 de 32 bytes o más.
       - key: JWT_SECRET
         sync: false
@@ -76,14 +76,20 @@ services:
       - key: VERCEL_TEAM_ID
         sync: false
 
-      # ── Verificación y acceso con proveedores ──────────────────────────
+      # Verificación y acceso con proveedores
       # Sin estas variables el registro verifica solo el correo y los botones
       # de Google y Apple no aparecen.
-      - key: WHATSAPP_CLOUD_TOKEN
+      # Celular por SMS (Twilio). WhatsApp queda congelado.
+      - key: PHONE_VERIFICATION_CHANNEL
+        value: sms
+      - key: TWILIO_ACCOUNT_SID
         sync: false
-      - key: WHATSAPP_CLOUD_PHONE_NUMBER_ID
+      - key: TWILIO_AUTH_TOKEN
         sync: false
-      - key: WHATSAPP_CLOUD_OTP_TEMPLATE
+      # Uno de los dos: número de Twilio (+1…) o Messaging Service (MG…).
+      - key: TWILIO_SMS_FROM
+        sync: false
+      - key: TWILIO_MESSAGING_SERVICE_SID
         sync: false
       - key: OAUTH_GOOGLE_CLIENT_ID
         sync: false

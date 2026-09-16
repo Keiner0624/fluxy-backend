@@ -31,6 +31,11 @@ public interface VerificationChallengeRepository extends JpaRepository<Verificat
                                          @Param("purpose") VerificationChallenge.Purpose purpose,
                                          @Param("type") VerificationChallenge.Type type);
 
+    /** Solo esa columna: guardar la entidad entera pisaría intentos o consumos hechos mientras tanto. */
+    @Modifying
+    @Query("UPDATE VerificationChallenge c SET c.deliveryFailedAt = :at WHERE c.id = :id")
+    int markDeliveryFailed(@Param("id") Long id, @Param("at") java.time.LocalDateTime at);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM VerificationChallenge c WHERE c.id = :id")
     Optional<VerificationChallenge> findByIdForUpdate(@Param("id") Long id);

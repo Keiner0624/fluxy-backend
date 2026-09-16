@@ -18,7 +18,7 @@ import java.util.List;
 public class User {
 
     public enum Status {
-        /** Registrado, pero todavía sin verificar el correo o el WhatsApp. No tiene empresa. */
+        /** Registrado, pero todavía sin verificar el correo o el celular. No tiene empresa. */
         PENDING_VERIFICATION,
         ACTIVE,
         /** Bloqueado por la plataforma. */
@@ -69,7 +69,7 @@ public class User {
     @Column(length = 24)
     private Status status;
 
-    /** WhatsApp del titular, con código de país y sin símbolos: 51987654321. */
+    /** Celular del titular, con código de país y sin símbolos: 51987654321. */
     @Column(length = 20)
     private String phone;
 

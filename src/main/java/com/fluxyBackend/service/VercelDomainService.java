@@ -28,7 +28,7 @@ public class VercelDomainService {
     @Value("${vercel.team_id:}")
     private String teamId;
 
-    // ─── Agregar dominio al proyecto de Vercel ───────────────────────────────
+    //Agregar dominio al proyecto de Vercel
     public boolean addDomain(String domain) {
         if (vercelToken.isBlank() || projectId.isBlank()) {
             log.warn("Vercel token o project ID no configurados");
@@ -61,7 +61,7 @@ public class VercelDomainService {
         }
     }
 
-    // ─── Verificar estado del dominio ────────────────────────────────────────
+    // Verificar estado del dominio
     public String getDomainStatus(String domain) {
         if (vercelToken.isBlank() || projectId.isBlank()) return "not_configured";
 
@@ -90,7 +90,7 @@ public class VercelDomainService {
         }
     }
 
-    // ─── Eliminar dominio del proyecto ───────────────────────────────────────
+    //  Eliminar dominio del proyecto
     public boolean removeDomain(String domain) {
         if (vercelToken.isBlank() || projectId.isBlank()) return false;
 

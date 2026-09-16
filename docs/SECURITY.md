@@ -11,7 +11,7 @@ hace el backend, qué hay que configurar y qué hacer ante un incidente.
 | Refresh token | Opaco de 256 bits, guardado como SHA-256. **Rota en cada uso.** Dura 14 días con "Recordarme" y 12 horas sin. |
 | Reutilización | Un refresh ya rotado dentro de 30 s responde `409 REFRESH_ROTATED` (dos pestañas). Pasado ese margen se considera robo: se revoca la sesión (`401 SESSION_REVOKED`), se audita y dispara alerta. |
 | Sesiones | `GET /me/sessions`, `DELETE /me/sessions/{id}`, `POST /me/sessions/revoke-others`, `POST /me/logout`. Aviso por correo al iniciar sesión desde un dispositivo nuevo. |
-| Step-up | Cambiar correo/WhatsApp, vincular proveedores, transferir la propiedad y eliminar el negocio exigen `POST /me/reauth` en los últimos 10 minutos (`403 REAUTH_REQUIRED`). |
+| Step-up | Cambiar correo o celular, vincular proveedores, transferir la propiedad y eliminar el negocio exigen `POST /me/reauth` en los últimos 10 minutos (`403 REAUTH_REQUIRED`). |
 | Contraseñas | BCrypt, 10 a 72 bytes, sin contraseñas comunes ni el correo. Login con tiempo constante, bloqueo progresivo por cuenta e IP. |
 | Recuperación | Respuesta idéntica exista o no la cuenta. Enlace de un solo uso (hash en base), 30 minutos, límite por IP y por correo. Al completar se cierran **todas** las sesiones y se avisa por correo. |
 
@@ -20,7 +20,7 @@ Los tokens emitidos antes de esta versión no tienen `sid`: cada persona inicia 
 ## 2. Registro verificado
 
 1. `POST /auth/signup` crea el usuario en `PENDING_VERIFICATION` y un borrador del negocio. **No crea la empresa.**
-2. Se envía un código de 6 dígitos al correo (SendGrid) y, si la Cloud API está configurada, al WhatsApp.
+2. Se envía un código de 6 dígitos al correo (SendGrid) y, si Twilio está configurado, por SMS al celular. La verificación por WhatsApp está **congelada** (el código sigue en `WhatsAppOtpService` y se reactiva con `PHONE_VERIFICATION_CHANNEL=whatsapp`).
 3. `POST /auth/signup/verify` con cada código. Al completar lo pendiente se crea la empresa y se abre la sesión.
 
 Códigos: HMAC con clave derivada, 10 minutos, 5 intentos, reenvío cada 60 s, 5 por destino y 10 por IP por hora, envío asíncrono después del commit, un código nuevo invalida los anteriores. Los registros sin completar se borran a los 7 días.
@@ -56,7 +56,7 @@ Todas las respuestas 429 llevan `Retry-After`. Los límites son por instancia (e
 
 - **Idempotencia:** `Idempotency-Key` en pedidos de la tienda, `POST /orders`, `POST /payments`, reembolsos y `create-preference`. Misma clave y contenido → misma respuesta (`Idempotent-Replayed: true`); otro contenido → `422`; en curso → `409`. Se guardan 24 h.
 - **Concurrencia:** stock y sesiones con bloqueo pesimista; `CHECK (stock >= 0)` en PostgreSQL.
-- **Proveedores externos:** tiempos límite en SendGrid, WhatsApp, JWKS, Vercel, Mercado Pago y Gemini; circuit breaker en SendGrid y WhatsApp.
+- **Proveedores externos:** tiempos límite en SendGrid, Twilio, WhatsApp, JWKS, Vercel, Mercado Pago y Gemini; circuit breaker en SendGrid, Twilio y WhatsApp.
 - **Errores:** forma única `{status, code, message, path, requestId}`; los 500 no exponen detalles.
 - **Cabeceras:** HSTS, `Referrer-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Permissions-Policy`.
 
@@ -77,7 +77,7 @@ El dueño puede programar la eliminación (`POST /company-account/deletion`, ide
 
 ## 6. Auditoría y observabilidad
 
-- `audit_logs`: accesos y fallos, sesiones, verificaciones, cambios de contraseña/correo/WhatsApp, equipo y propiedad, plan, configuración, cancelaciones, reembolsos, ajustes de stock, borrados, exportaciones y cambios de estado. Sin secretos; IP como hash. Retención 365 días. Consulta: `GET /audit` (permiso `AUDIT_VIEW`).
+- `audit_logs`: accesos y fallos, sesiones, verificaciones, cambios de contraseña/correo/celular, equipo y propiedad, plan, configuración, cancelaciones, reembolsos, ajustes de stock, borrados, exportaciones y cambios de estado. Sin secretos; IP como hash. Retención 365 días. Consulta: `GET /audit` (permiso `AUDIT_VIEW`).
 - Cada petición lleva `X-Request-Id` (se acepta el del cliente o se genera) y aparece en cada línea de log.
 - Micrometer: `fluxy.auth.login`, `fluxy.auth.refresh_reuse`, `fluxy.otp.sent`, `fluxy.ratelimit.blocked`, `fluxy.http.denied`, `fluxy.http.server_errors` y `fluxy.company.lifecycle` en `/actuator/metrics` (solo token de administrador).
 - Alertas por correo a `SECURITY_ALERT_EMAIL` (o `ADMIN_EMAIL`) al superar umbrales: fallos de login, 5xx, 429, 401/403, fallos de envío de códigos y **cualquier** reutilización de refresh token. Máximo una alerta por señal por hora.
@@ -88,7 +88,11 @@ El dueño puede programar la eliminación (`POST /company-account/deletion`, ide
 |---|---|---|
 | `JWT_SECRET` | Sí | Base64 de 32+ bytes. Rotarla invalida todas las sesiones y códigos vigentes. |
 | `SENDGRID_API_KEY`, `MAIL_FROM` | Sí | Códigos, recuperación y avisos. El remitente debe estar verificado en SendGrid. |
-| `WHATSAPP_CLOUD_TOKEN`, `WHATSAPP_CLOUD_PHONE_NUMBER_ID`, `WHATSAPP_CLOUD_OTP_TEMPLATE` | No | Verificación por WhatsApp. Plantilla de categoría **Authentication** aprobada en Meta, con el código como `{{1}}` (y botón de copiar código si `WHATSAPP_CLOUD_TEMPLATE_COPY_BUTTON=true`). |
+| `PHONE_VERIFICATION_CHANNEL` | No | `sms` (por defecto), `whatsapp` (congelado) o `none`. |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | No | Verificación del celular por SMS. Sin ellas el registro verifica solo el correo. |
+| `TWILIO_SMS_FROM` o `TWILIO_MESSAGING_SERVICE_SID` | Con Twilio | Remitente: número de Twilio (`+1…`) o Messaging Service (`MG…`, tiene prioridad). |
+| `SMS_BRAND` | No | Nombre en el texto del SMS (por defecto `Fluxy`). |
+| `WHATSAPP_CLOUD_TOKEN`, `WHATSAPP_CLOUD_PHONE_NUMBER_ID`, `WHATSAPP_CLOUD_OTP_TEMPLATE` | No | **Congelado.** Solo se usan con `PHONE_VERIFICATION_CHANNEL=whatsapp`: plantilla **Authentication** aprobada en Meta, con el código como `{{1}}`. |
 | `OAUTH_GOOGLE_CLIENT_ID` | No | Client ID web de Google Cloud; origen autorizado = URL del frontend. |
 | `OAUTH_APPLE_CLIENT_ID`, `OAUTH_APPLE_REDIRECT_URI` | No | Services ID de Apple y la URL de retorno registrada. |
 | `SECURITY_ALERT_EMAIL` | Recomendada | Destino de las alertas. |

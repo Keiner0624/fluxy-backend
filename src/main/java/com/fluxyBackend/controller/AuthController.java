@@ -90,7 +90,7 @@ public class AuthController {
     // ─── Registro verificado ──────────────────────────────────────────────────
 
     @Operation(summary = "Crear una cuenta",
-            description = "Guarda los datos y envía un código al correo (y al WhatsApp si está disponible). "
+            description = "Guarda los datos y envía un código al correo (y por SMS al celular si está disponible). "
                     + "La tienda se crea al verificar. Devuelve signupToken para los pasos siguientes.")
     @PostMapping("/signup")
     public SignupService.SignupState signup(@RequestBody SignupService.SignupRequest request) {
@@ -144,6 +144,7 @@ public class AuthController {
                 ? Map.of("clientId", oidcTokenVerifier.clientId(UserIdentity.Provider.APPLE),
                 "redirectUri", appleRedirectUri == null ? "" : appleRedirectUri) : null);
         config.put("phoneVerification", verificationService.phoneChannelAvailable());
+        config.put("phoneChannel", verificationService.phoneChannel());
         return config;
     }
 

@@ -90,7 +90,7 @@ public class AccountSecurityController {
         return Map.of("message", "Contraseña actualizada.", "sessionsRevoked", revoked);
     }
 
-    // ─── Correo y WhatsApp ────────────────────────────────────────────────────
+    // ─── Correo y celular ─────────────────────────────────────────────────────
 
     @Operation(summary = "Enviar código para verificar el correo actual")
     @PostMapping("/email/verification")
@@ -118,17 +118,17 @@ public class AccountSecurityController {
         return Map.of("message", "Correo actualizado.");
     }
 
-    @Operation(summary = "Pedir cambio de WhatsApp", description = "Requiere identidad reciente y la Cloud API configurada.")
+    @Operation(summary = "Pedir cambio de celular", description = "Requiere identidad reciente y un canal de verificación configurado (SMS). Envía un código al número nuevo.")
     @PostMapping("/phone/change")
     public VerificationService.Issued requestPhoneChange(@RequestBody AccountSecurityService.ContactRequest request) {
         return securityService.requestPhoneChange(accessService.current().user(), accessService.currentSessionId(), request.value());
     }
 
-    @Operation(summary = "Confirmar cambio de WhatsApp", description = "applyToStore también lo usa como WhatsApp de la tienda.")
+    @Operation(summary = "Confirmar cambio de celular", description = "applyToStore también lo usa como WhatsApp de la tienda.")
     @PostMapping("/phone/change/confirm")
     public Map<String, String> confirmPhoneChange(@RequestBody AccountSecurityService.CodeRequest request) {
         securityService.confirmPhoneChange(accessService.current(), request.code(), Boolean.TRUE.equals(request.applyToStore()));
-        return Map.of("message", "WhatsApp actualizado.");
+        return Map.of("message", "Celular actualizado.");
     }
 
     // ─── Cuentas vinculadas ───────────────────────────────────────────────────

@@ -31,7 +31,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Códigos de un solo uso por correo o WhatsApp.
+ * Códigos de un solo uso por correo o al celular (SMS).
  *
  * 6 dígitos, 10 minutos, 5 intentos, reenvío cada 60 segundos, 5 por hora por
  * destino y 10 por hora por IP. El código se guarda como HMAC y se envía
@@ -51,6 +51,7 @@ public class VerificationService {
     private final VerificationChallengeRepository repository;
     private final EmailService emailService;
     private final WhatsAppOtpService whatsAppOtpService;
+    private final SmsOtpService smsOtpService;
     private final JwtService jwtService;
     private final SecurityMonitor monitor;
     private final ApplicationEventPublisher events;
@@ -69,8 +70,25 @@ public class VerificationService {
 
     record Delivery(Long challengeId, Type type, String destination, String code, String recipientName, Purpose purpose) {}
 
+    /**
+     * Canal para verificar el celular: sms (Twilio), whatsapp (Cloud API de Meta,
+     * congelado por ahora) o none. Sin credenciales del canal elegido, el
+     * celular no se verifica y alcanza con el correo.
+     */
+    @Value("${app.verification.phone_channel:sms}")
+    private String phoneChannel;
+
+    public String phoneChannel() {
+        String channel = phoneChannel == null ? "" : phoneChannel.strip().toLowerCase(Locale.ROOT);
+        return switch (channel) {
+            case "whatsapp" -> whatsAppOtpService.isConfigured() ? "WHATSAPP" : "NONE";
+            case "sms" -> smsOtpService.isConfigured() ? "SMS" : "NONE";
+            default -> "NONE";
+        };
+    }
+
     public boolean phoneChannelAvailable() {
-        return whatsAppOtpService.isConfigured();
+        return !"NONE".equals(phoneChannel());
     }
 
     // ─── Emisión ──────────────────────────────────────────────────────────────
@@ -130,17 +148,16 @@ public class VerificationService {
         boolean delivered = delivery.type() == Type.EMAIL
                 ? emailService.sendVerificationCode(delivery.destination(), delivery.recipientName(), delivery.code(),
                 purposeLabel(delivery.purpose()), CODE_TTL.toMinutes())
-                : whatsAppOtpService.sendCode(delivery.destination(), delivery.code());
-        monitor.recordOtpDelivery(delivery.type().name(), delivered);
+                : "WHATSAPP".equals(phoneChannel())
+                ? whatsAppOtpService.sendCode(delivery.destination(), delivery.code())
+                : smsOtpService.sendCode(delivery.destination(), delivery.code(), CODE_TTL.toMinutes());
+        monitor.recordOtpDelivery(delivery.type() == Type.EMAIL ? "EMAIL" : phoneChannel(), delivered);
         if (!delivered) markDeliveryFailed(delivery.challengeId());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markDeliveryFailed(Long challengeId) {
-        repository.findById(challengeId).ifPresent(c -> {
-            c.setDeliveryFailedAt(LocalDateTime.now());
-            repository.save(c);
-        });
+        repository.markDeliveryFailed(challengeId, LocalDateTime.now());
     }
 
     // ─── Verificación ─────────────────────────────────────────────────────────
@@ -227,7 +244,7 @@ public class VerificationService {
             case SIGN_UP -> "crear tu cuenta";
             case VERIFY_EMAIL -> "verificar tu correo";
             case CHANGE_EMAIL -> "confirmar tu nuevo correo";
-            case CHANGE_PHONE -> "confirmar tu nuevo WhatsApp";
+            case CHANGE_PHONE -> "confirmar tu nuevo celular";
         };
     }
 }

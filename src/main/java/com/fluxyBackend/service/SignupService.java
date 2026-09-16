@@ -29,7 +29,7 @@ import java.util.*;
  * Registro verificado.
  *
  * 1. Se crea el usuario pendiente con los datos del negocio en un borrador.
- * 2. Se verifica el correo (siempre) y el WhatsApp (cuando hay proveedor).
+ * 2. Se verifica el correo (siempre) y el celular por SMS (cuando hay proveedor).
  * 3. Recién entonces se crea la empresa y se abre la sesión.
  *
  * Con Google o Apple el correo ya viene verificado por el proveedor y el paso 1
@@ -229,10 +229,10 @@ public class SignupService {
         }
         if (!verificationService.phoneChannelAvailable()) {
             throw new BusinessException(HttpStatus.CONFLICT, "PHONE_CHANNEL_UNAVAILABLE",
-                    "La verificación por WhatsApp todavía no está disponible.");
+                    "La verificación del celular todavía no está disponible.");
         }
         if (user.getPhone() == null) throw new BusinessException("Primero completá los datos del negocio.");
-        if (user.getPhoneVerifiedAt() != null) throw new BusinessException("Tu WhatsApp ya está verificado.");
+        if (user.getPhoneVerifiedAt() != null) throw new BusinessException("Tu celular ya está verificado.");
         return verificationService.issue(user.getId(), Type.PHONE, Purpose.SIGN_UP, user.getPhone(), null, user.getFullName());
     }
 

@@ -155,7 +155,7 @@ public class CompanyLifecycleService {
                 status == Status.ACTIVE || status == Status.INACTIVE || status == Status.SUSPENDED);
     }
 
-    // ─── Acciones del dueño ───────────────────────────────────────────────────
+    //  Acciones del dueño
 
     @Transactional
     public LifecycleView reactivate(Member member) {

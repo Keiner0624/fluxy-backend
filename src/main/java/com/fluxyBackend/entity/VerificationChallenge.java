@@ -8,7 +8,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 /**
- * Código de verificación enviado por correo o WhatsApp. Se guarda el HMAC del
+ * Código de verificación enviado por correo o al celular (SMS). Se guarda el HMAC del
  * código, nunca el código: quien lea la base no puede usarlo.
  */
 @Entity

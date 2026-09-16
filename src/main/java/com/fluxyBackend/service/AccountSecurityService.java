@@ -54,7 +54,7 @@ public class AccountSecurityService {
     private final EmailService emailService;
 
     public record Overview(String email, boolean emailVerified, String phone, boolean phoneVerified,
-                           boolean phoneVerificationAvailable, boolean hasPassword, List<String> linkedProviders,
+                           boolean phoneVerificationAvailable, String phoneChannel, boolean hasPassword, List<String> linkedProviders,
                            Map<String, Boolean> providersEnabled) {}
 
     public record ReauthRequest(String password, String provider, String idToken, String nonce) {}
@@ -68,7 +68,8 @@ public class AccountSecurityService {
                 .map(i -> i.getProvider().name()).sorted().toList();
         return new Overview(user.getEmail(), user.isEmailVerified(),
                 user.getPhone() == null ? null : VerificationService.maskPhone(user.getPhone()),
-                user.getPhoneVerifiedAt() != null, verificationService.phoneChannelAvailable(), user.hasPassword(),
+                user.getPhoneVerifiedAt() != null, verificationService.phoneChannelAvailable(),
+                verificationService.phoneChannel(), user.hasPassword(),
                 linked, Map.of("GOOGLE", oidcTokenVerifier.isEnabled(UserIdentity.Provider.GOOGLE),
                 "APPLE", oidcTokenVerifier.isEnabled(UserIdentity.Provider.APPLE)));
     }
@@ -177,14 +178,14 @@ public class AccountSecurityService {
                 "El correo de tu cuenta de Fluxy ahora es " + VerificationService.maskEmail(newEmail) + "."));
     }
 
-    // ─── WhatsApp ─────────────────────────────────────────────────────────────
+    // ─── Celular ──────────────────────────────────────────────────────────────
 
     @Transactional
     public VerificationService.Issued requestPhoneChange(User user, String sessionId, String phone) {
         sessionService.requireRecentAuth(sessionId, RECENT_AUTH);
         if (!verificationService.phoneChannelAvailable()) {
             throw new BusinessException(HttpStatus.CONFLICT, "PHONE_CHANNEL_UNAVAILABLE",
-                    "La verificación por WhatsApp todavía no está disponible.");
+                    "La verificación del celular todavía no está disponible.");
         }
         String normalized = SignupService.normalizePeruPhone(phone);
         return verificationService.issue(user.getId(), Type.PHONE, Purpose.CHANGE_PHONE, normalized, normalized, user.getFullName());
@@ -206,7 +207,7 @@ public class AccountSecurityService {
         }
         auditService.record(member, AuditAction.PHONE_CHANGED, "USER", user.getId(),
                 Map.of("to", VerificationService.maskPhone(phone), "appliedToStore", applyToStore));
-        notify(user, "Tu WhatsApp cambió", "El WhatsApp de tu cuenta ahora es " + VerificationService.maskPhone(phone) + ".");
+        notify(user, "Tu celular cambió", "El celular de tu cuenta ahora es " + VerificationService.maskPhone(phone) + ".");
     }
 
     // ─── Cuentas vinculadas ───────────────────────────────────────────────────
