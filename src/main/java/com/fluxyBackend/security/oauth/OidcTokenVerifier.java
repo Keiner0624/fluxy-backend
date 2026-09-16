@@ -27,6 +27,7 @@ import java.security.spec.RSAPublicKeySpec;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,7 +43,13 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class OidcTokenVerifier {
 
-    public record VerifiedIdentity(Provider provider, String subject, String email, boolean emailVerified) {}
+    /**
+     * {@code emailAuthoritative}: el proveedor es dueño del correo y lo garantiza, así que
+     * probar la identidad equivale a probar el correo. Google solo lo es para Gmail y para
+     * dominios de Google Workspace (claim {@code hd}); Apple, para los correos que verifica.
+     */
+    public record VerifiedIdentity(Provider provider, String subject, String email, boolean emailVerified,
+                                   boolean emailAuthoritative) {}
 
     private record ProviderConfig(String jwksUri, Set<String> issuers) {}
 
@@ -121,7 +128,12 @@ public class OidcTokenVerifier {
         if (subject == null || subject.isBlank() || email == null || email.isBlank()) throw invalid(provider);
         Object verified = claims.get("email_verified");
         boolean emailVerified = Boolean.TRUE.equals(verified) || "true".equalsIgnoreCase(String.valueOf(verified));
-        return new VerifiedIdentity(provider, subject, email.strip().toLowerCase(), emailVerified);
+        String normalized = email.strip().toLowerCase(Locale.ROOT);
+        String hostedDomain = claims.get("hd", String.class);
+        boolean authoritative = emailVerified && (provider == Provider.APPLE
+                || normalized.endsWith("@gmail.com") || normalized.endsWith("@googlemail.com")
+                || (hostedDomain != null && normalized.endsWith("@" + hostedDomain.toLowerCase(Locale.ROOT))));
+        return new VerifiedIdentity(provider, subject, normalized, emailVerified, authoritative);
     }
 
     private PublicKey publicKey(Provider provider, String kid) {

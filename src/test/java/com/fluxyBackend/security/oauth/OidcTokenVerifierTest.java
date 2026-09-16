@@ -49,6 +49,23 @@ class OidcTokenVerifierTest {
         assertThat(identity.subject()).isEqualTo("google-sub-1");
         assertThat(identity.email()).isEqualTo("persona@gmail.com");
         assertThat(identity.emailVerified()).isTrue();
+        assertThat(identity.emailAuthoritative()).isTrue();
+    }
+
+    @Test
+    void googleSoloGarantizaGmailYSuWorkspace() {
+        assertThat(verifyGoogle("ana@empresa.com", true, null).emailAuthoritative()).isFalse();
+        assertThat(verifyGoogle("ana@empresa.com", true, "empresa.com").emailAuthoritative()).isTrue();
+        assertThat(verifyGoogle("ana@gmail.com", false, null).emailAuthoritative()).isFalse();
+    }
+
+    private OidcTokenVerifier.VerifiedIdentity verifyGoogle(String email, boolean verified, String hostedDomain) {
+        var builder = Jwts.builder().header().keyId("k1").and()
+                .issuer("https://accounts.google.com").audience().add(CLIENT_ID).and()
+                .subject("google-sub-2").claim("email", email).claim("email_verified", verified)
+                .claim("nonce", NONCE).expiration(new Date(System.currentTimeMillis() + 600_000));
+        if (hostedDomain != null) builder.claim("hd", hostedDomain);
+        return verifier.verify(Provider.GOOGLE, builder.signWith(providerKeys.getPrivate(), Jwts.SIG.RS256).compact(), NONCE);
     }
 
     @Test

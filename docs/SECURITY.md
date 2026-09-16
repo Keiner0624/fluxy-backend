@@ -29,7 +29,7 @@ Códigos: HMAC con clave derivada, 10 minutos, 5 intentos, reenvío cada 60 s, 5
 
 `POST /auth/oauth/nonce` → el frontend pide el ID token con ese nonce → `POST /auth/oauth/{google|apple}`.
 Se verifica firma RS256 con las JWKS del proveedor, emisor, audiencia (client id), vencimiento y nonce de un solo uso.
-Nunca se vincula solo una cuenta existente por coincidir el correo (`409 ACCOUNT_EXISTS`): se vincula desde Seguridad, con identidad reciente.
+Si el correo ya tiene cuenta, se vincula y entra solo cuando el proveedor garantiza ese correo (`email_verified` y, en Google, Gmail o un dominio de Workspace con `hd`) y la cuenta ya lo tenía verificado. Queda en la actividad (`IDENTITY_LINKED`, origen `AUTO_EMAIL`) y se avisa por correo. En cualquier otro caso responde `409 ACCOUNT_EXISTS` y se vincula desde Seguridad, con identidad reciente.
 
 ## 3. Autorización y aislamiento
 

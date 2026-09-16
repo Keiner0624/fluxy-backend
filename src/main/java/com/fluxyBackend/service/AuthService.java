@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +48,7 @@ public class AuthService {
     private final OAuthNonceService nonceService;
     private final AuditService auditService;
     private final SecurityMonitor monitor;
+    private final EmailService emailService;
 
     /** Resultado del acceso con Google o Apple: sesión abierta, o registro por completar. */
     public record OAuthResult(String status, AuthResponse session, SignupService.SignupState signup) {}
@@ -129,26 +131,50 @@ public class AuthService {
                     .orElseThrow(() -> new BusinessException(HttpStatus.UNAUTHORIZED, "OAUTH_TOKEN_INVALID", "Cuenta no encontrada."));
             linked.setLastUsedAt(LocalDateTime.now());
             identityRepository.save(linked);
-            if (user.getStatus() == User.Status.PENDING_VERIFICATION) {
-                return new OAuthResult("ONBOARDING_REQUIRED", null, signupService.resume(user));
-            }
-            ensureCanSignIn(user);
-            UserSession.AuthMethod method = provider == UserIdentity.Provider.GOOGLE
-                    ? UserSession.AuthMethod.GOOGLE : UserSession.AuthMethod.APPLE;
-            AuthResponse session = sessionService.create(user, method, rememberMe, http);
-            monitor.recordLogin(true);
-            auditService.record(user.getCompany().getId(), user, AuditAction.LOGIN_SUCCESS, "USER", user.getId(),
-                    Map.of("method", provider.name()));
-            return new OAuthResult("LOGGED_IN", session, null);
+            return signInWithIdentity(user, provider, rememberMe, http);
         }
 
-        // Nunca se crea un duplicado ni se vincula solo: quien controla la cuenta decide desde Seguridad.
-        if (userRepository.existsByEmailIgnoreCase(identity.email())) {
-            throw new BusinessException(HttpStatus.CONFLICT, "ACCOUNT_EXISTS",
-                    "Ya tenés una cuenta con este correo. Iniciá sesión con tu contraseña y vinculá "
-                            + OidcTokenVerifier.label(provider) + " desde Seguridad.");
+        User existing = userRepository.findByEmailIgnoreCase(identity.email()).orElse(null);
+        if (existing != null) {
+            // Se vincula solo cuando el proveedor garantiza el correo y la cuenta ya lo tenía verificado:
+            // entrar con ese Google/Apple prueba lo mismo que un código enviado a ese correo.
+            boolean canAutoLink = identity.emailAuthoritative() && existing.isEmailVerified()
+                    && identityRepository.findByUserIdAndProvider(existing.getId(), provider).isEmpty();
+            if (!canAutoLink) {
+                throw new BusinessException(HttpStatus.CONFLICT, "ACCOUNT_EXISTS",
+                        "Ya tenés una cuenta con este correo. Iniciá sesión con tu contraseña y vinculá "
+                                + OidcTokenVerifier.label(provider) + " desde Seguridad.");
+            }
+            UserIdentity created = new UserIdentity(existing.getId(), provider, identity.subject(), identity.email());
+            created.setLastUsedAt(LocalDateTime.now());
+            identityRepository.save(created);
+            auditService.record(existing.getCompany() == null ? null : existing.getCompany().getId(), existing,
+                    AuditAction.IDENTITY_LINKED, "USER", existing.getId(),
+                    Map.of("provider", provider.name(), "by", "AUTO_EMAIL"));
+            String label = OidcTokenVerifier.label(provider);
+            String email = existing.getEmail();
+            String name = existing.getFullName();
+            CompletableFuture.runAsync(() -> emailService.sendSecurityNotice(email, name, "Vinculamos tu cuenta de " + label,
+                    "Iniciaste sesión en Fluxy con " + label + " y la vinculamos a tu cuenta. "
+                            + "Si no fuiste vos, cambiá tu contraseña y desvinculala desde Seguridad."));
+            return signInWithIdentity(existing, provider, rememberMe, http);
         }
         return new OAuthResult("ONBOARDING_REQUIRED", null, signupService.startWithIdentity(identity, nameHint));
+    }
+
+    private OAuthResult signInWithIdentity(User user, UserIdentity.Provider provider, boolean rememberMe,
+                                           HttpServletRequest http) {
+        if (user.getStatus() == User.Status.PENDING_VERIFICATION) {
+            return new OAuthResult("ONBOARDING_REQUIRED", null, signupService.resume(user));
+        }
+        ensureCanSignIn(user);
+        UserSession.AuthMethod method = provider == UserIdentity.Provider.GOOGLE
+                ? UserSession.AuthMethod.GOOGLE : UserSession.AuthMethod.APPLE;
+        AuthResponse session = sessionService.create(user, method, rememberMe, http);
+        monitor.recordLogin(true);
+        auditService.record(user.getCompany().getId(), user, AuditAction.LOGIN_SUCCESS, "USER", user.getId(),
+                Map.of("method", provider.name()));
+        return new OAuthResult("LOGGED_IN", session, null);
     }
 
     /** Estado de la cuenta y de su acceso a la empresa, una vez probada la identidad. */

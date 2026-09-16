@@ -4,6 +4,7 @@ import com.fluxyBackend.controller.AuthResponse;
 import com.fluxyBackend.entity.*;
 import com.fluxyBackend.entity.VerificationChallenge.Type;
 import com.fluxyBackend.repository.*;
+import com.fluxyBackend.security.oauth.OidcTokenVerifier;
 import com.fluxyBackend.service.CompanyLifecycleService;
 import com.fluxyBackend.service.VerificationService;
 import com.fluxyBackend.support.TestAuth;
@@ -15,6 +16,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -29,6 +31,9 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -65,6 +70,8 @@ class SecurityBlueprintIntegrationTest {
     @Autowired private UserSessionRepository sessionRepository;
     @Autowired private VerificationChallengeRepository challengeRepository;
     @Autowired private PasswordResetTokenRepository resetTokenRepository;
+    @Autowired private UserIdentityRepository identityRepository;
+    @MockitoBean private OidcTokenVerifier oidcTokenVerifier;
 
     @BeforeEach
     void resetLimits() {
@@ -206,6 +213,41 @@ class SecurityBlueprintIntegrationTest {
         String forged = io.jsonwebtoken.Jwts.builder().subject("x@fluxy.invalid").claim("uid", 1).claim("sid", "s")
                 .claim("typ", "access").signWith(io.jsonwebtoken.security.Keys.hmacShaKeyFor(new byte[32])).compact();
         mvc.perform(get("/me").header("Authorization", "Bearer " + forged)).andExpect(status().isUnauthorized());
+    }
+
+    // ─── Google y Apple ───────────────────────────────────────────────────────
+
+    @Test
+    void googleConElMismoCorreoVerificadoEntraYQuedaVinculado() throws Exception {
+        Tenant t = tenant();
+        googleSays("sub-" + uid(), t.owner().getEmail(), true);
+
+        mvc.perform(oauthGoogle()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("LOGGED_IN"))
+                .andExpect(jsonPath("$.session.token").isNotEmpty());
+        assertThat(identityRepository.findByUserIdAndProvider(t.owner().getId(), UserIdentity.Provider.GOOGLE)).isPresent();
+        assertThat(auditCount(t.company().getId(), "IDENTITY_LINKED")).isEqualTo(1);
+    }
+
+    @Test
+    void googleSinGarantizarElCorreoNoSeVinculaSolo() throws Exception {
+        Tenant t = tenant();
+        googleSays("sub-" + uid(), t.owner().getEmail(), false);
+
+        mvc.perform(oauthGoogle()).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_EXISTS"));
+        assertThat(identityRepository.findByUserIdAndProvider(t.owner().getId(), UserIdentity.Provider.GOOGLE)).isEmpty();
+    }
+
+    private void googleSays(String subject, String email, boolean authoritative) {
+        when(oidcTokenVerifier.verify(eq(UserIdentity.Provider.GOOGLE), any(), any()))
+                .thenReturn(new OidcTokenVerifier.VerifiedIdentity(UserIdentity.Provider.GOOGLE, subject, email, true, authoritative));
+    }
+
+    private MockHttpServletRequestBuilder oauthGoogle() throws Exception {
+        String nonce = body(mvc.perform(post("/auth/oauth/nonce").with(ip())).andReturn()).path("nonce").asString();
+        return post("/auth/oauth/google").with(ip()).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("idToken", "x.y.z", "nonce", nonce, "rememberMe", false)));
     }
 
     // ─── Aislamiento entre negocios ──────────────────────────────────────────
