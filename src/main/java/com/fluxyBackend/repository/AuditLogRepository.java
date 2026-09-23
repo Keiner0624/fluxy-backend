@@ -15,6 +15,8 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long>, JpaSp
     @Query("SELECT DISTINCT a.action FROM AuditLog a WHERE a.companyId = :companyId ORDER BY a.action")
     List<String> findActions(@Param("companyId") Long companyId);
 
+    long countByCompanyIdAndActionInAndCreatedAtAfter(Long companyId, java.util.Collection<String> actions, LocalDateTime since);
+
     @Modifying
     @Query("DELETE FROM AuditLog a WHERE a.createdAt < :cutoff")
     int deleteOlderThan(@Param("cutoff") LocalDateTime cutoff);

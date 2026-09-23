@@ -48,7 +48,7 @@ public class IntegrationService {
 
     public Overview overview(Company company) {
         CompanyIntegrations settings = settings(company.getId());
-        boolean paidPlan = company.getPlan() == Company.Plan.PRO || company.getPlan() == Company.Plan.BUSINESS;
+        boolean paidPlan = com.fluxyBackend.billing.PlanCatalog.has(company, com.fluxyBackend.billing.Feature.WHATSAPP);
         String phone = company.getPhone();
         return new Overview(
                 new WhatsApp(settings.isWhatsappEnabled(), phone,

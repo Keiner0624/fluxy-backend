@@ -221,6 +221,14 @@ public class EmailService {
                 .append("</td><td style=\"padding:4px 0; color:#0b172a; white-space:pre-line;\">").append(escape(value)).append("</td></tr>");
     }
 
+    /** Aviso de facturación con acceso directo a Plan y facturación. */
+    public void sendBillingNotice(String toEmail, String toName, String title, String text) {
+        String html = securityLayout(title, escape(text),
+                "<a href=\"" + escape(frontendUrl) + "/dashboard/plans\" style=\"display:inline-block; margin-top:14px; background:#1769e0; color:#ffffff; padding:11px 20px; border-radius:10px; font-weight:600; font-size:14px; text-decoration:none;\">Ver Plan y facturación</a>",
+                "Recibís este aviso porque sos titular del negocio en Fluxy.");
+        send(toEmail, toName, title + " — Fluxy", html);
+    }
+
     @Value("${app.frontend_url:http://localhost:5173}")
     private String frontendUrl;
 

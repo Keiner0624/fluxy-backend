@@ -52,7 +52,6 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
     private final BusinessClock clock;
 
-    private static final List<String> PRO_PLANS = List.of("PRO", "BUSINESS");
 
     // ─── Vistas ───────────────────────────────────────────────────────────────
 
@@ -182,6 +181,10 @@ public class OrderService {
             return;
         }
 
+        // Los cupones son del plan Pro: con el plan vencido dejan de aplicarse (se conservan).
+        if (!com.fluxyBackend.billing.PlanCatalog.has(company, com.fluxyBackend.billing.Feature.COUPONS)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Este cupón no está disponible");
+        }
         Coupon coupon = couponRepository
                 .findByCodeIgnoreCaseAndCompanyForUpdate(couponCode.trim(), company)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -373,8 +376,7 @@ public class OrderService {
 
     // ─── Generar URL de WhatsApp para el cliente (retornar al frontend) ───────
     public String generateWhatsAppUrl(Order order, Company company) {
-        String plan = company.getPlan() != null ? company.getPlan().name() : "FREE";
-        if (!PRO_PLANS.contains(plan)) return null;
+        if (!com.fluxyBackend.billing.PlanCatalog.has(company, com.fluxyBackend.billing.Feature.WHATSAPP)) return null;
         if (!integrationService.whatsappEnabled(company.getId())) return null;
 
         String phone = company.getPhone();

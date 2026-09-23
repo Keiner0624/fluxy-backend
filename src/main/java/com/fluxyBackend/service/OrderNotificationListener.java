@@ -45,8 +45,7 @@ public class OrderNotificationListener {
 
             Company company = order.getCompany();
             if (company != null
-                    && (company.getPlan() == Company.Plan.PRO
-                    || company.getPlan() == Company.Plan.BUSINESS)
+                    && com.fluxyBackend.billing.PlanCatalog.has(company, com.fluxyBackend.billing.Feature.WHATSAPP)
                     && integrationService.whatsappEnabled(company.getId())
                     && company.getPhone() != null
                     && !company.getPhone().isBlank()) {

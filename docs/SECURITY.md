@@ -103,6 +103,10 @@ El dueño puede programar la eliminación (`POST /company-account/deletion`, ide
 | `LIFECYCLE_*_DAYS`, `LIFECYCLE_PURGE_ENABLED` | No | Umbrales del ciclo de vida; purga apagada por defecto. |
 | `VERIFICATION_LOG_CODES` | Solo local | Escribe los códigos en el log. **Nunca en producción.** |
 
+## 7.0 Planes y suscripciones
+
+El acceso por plan se decide en el servidor (`EntitlementService`); un plan vencido vale Free en el acto. Cancelar deja el plan activo hasta el fin de lo pagado. Detalle en `docs/BILLING.md`.
+
 ## 7.1 Documentos legales y Libro de Reclamaciones
 
 - **Versiones:** `LegalAcceptance.TERMS_VERSION` debe ser igual a `CURRENT_LEGAL_VERSION` del frontend. Cada versión publicada es un archivo inmutable y las anteriores siguen visibles en `/terms`.

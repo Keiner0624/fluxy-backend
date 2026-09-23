@@ -24,6 +24,7 @@ public class ReportController {
 
     private final AnalyticsService analyticsService;
     private final AccessService accessService;
+    private final com.fluxyBackend.billing.EntitlementService entitlements;
 
     @Operation(summary = "Resumen del período", description = "Incluye la comparación con el período anterior de igual duración.")
     @GetMapping("/summary")
@@ -87,7 +88,10 @@ public class ReportController {
         return analyticsService.export(companyId(), type, from, to);
     }
 
+    /** Todos los reportes son del plan Pro: se valida acá, en el único acceso a la empresa. */
     private Long companyId() {
-        return accessService.current().companyId();
+        var member = accessService.current();
+        entitlements.require(member.company(), com.fluxyBackend.billing.Feature.REPORTS);
+        return member.companyId();
     }
 }

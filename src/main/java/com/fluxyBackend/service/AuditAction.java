@@ -39,6 +39,8 @@ public final class AuditAction {
 
     // Plan y empresa
     public static final String PLAN_CHANGED = "PLAN_CHANGED";
+    public static final String SUBSCRIPTION_CANCEL_REQUESTED = "SUBSCRIPTION_CANCEL_REQUESTED";
+    public static final String SUBSCRIPTION_REACTIVATED = "SUBSCRIPTION_REACTIVATED";
     public static final String SETTINGS_UPDATED = "SETTINGS_UPDATED";
     public static final String INTEGRATION_UPDATED = "INTEGRATION_UPDATED";
     public static final String COMPANY_STATUS_CHANGED = "COMPANY_STATUS_CHANGED";

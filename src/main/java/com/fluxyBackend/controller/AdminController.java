@@ -51,6 +51,7 @@ public class AdminController {
     private final jakarta.persistence.EntityManager entityManager;
     private final com.fluxyBackend.service.AuditService auditService;
     private final com.fluxyBackend.security.SessionService sessionService;
+    private final com.fluxyBackend.billing.SubscriptionService subscriptionService;
 
     private void requireAdmin(Authentication auth) {
         String email      = auth.getName();
@@ -248,13 +249,7 @@ public class AdminController {
                     "La cantidad de meses debe estar entre 1 y 12");
         }
 
-        Plan previous = company.getPlan();
-        company.setPlan(plan);
-        company.setPlanActivatedAt(LocalDateTime.now());
-        company.setPlanExpiresAt(plan == Plan.FREE ? null : LocalDateTime.now().plusMonths(months));
-        companyRepository.save(company);
-        auditService.record(companyId, null, com.fluxyBackend.service.AuditAction.PLAN_CHANGED, "COMPANY", companyId,
-                Map.of("from", String.valueOf(previous), "to", plan.name(), "months", months, "by", "ADMIN"));
+        subscriptionService.adminGrant(company.getId(), plan, months, "Administración");
 
         return ResponseEntity.ok(Map.of("message", "Plan actualizado a " + planStr));
     }

@@ -20,6 +20,8 @@ public interface OrderPaymentRepository
     List<OrderPayment> findByOrderIdIn(Collection<Long> orderIds);
     List<OrderPayment> findByCompanyId(Long companyId);
 
+    long countByCompanyIdAndStatus(Long companyId, OrderPayment.Status status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM OrderPayment p WHERE p.id = :id AND p.companyId = :companyId")
     Optional<OrderPayment> findByIdAndCompanyIdForUpdate(@Param("id") Long id,

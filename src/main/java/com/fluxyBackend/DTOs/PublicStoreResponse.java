@@ -36,9 +36,11 @@ public record PublicStoreResponse(
                 company.getDescription(),
                 company.getPrimaryColor(),
                 company.getLogoUrl(),
-                company.getStoreStyle(),
+                // Sin el plan, la tienda se ve con el estilo por defecto; el del vendedor queda guardado.
+                com.fluxyBackend.billing.PlanCatalog.has(company, com.fluxyBackend.billing.Feature.CUSTOM_STYLE)
+                        ? company.getStoreStyle() : null,
                 company.getPaymentMethods(),
-                company.getPlan(),
+                com.fluxyBackend.billing.PlanCatalog.effectivePlan(company),
                 integrations == null ? null : integrations.getGoogleAnalyticsId(),
                 integrations == null ? null : integrations.getMetaPixelId(),
                 integrations == null || integrations.isWhatsappEnabled(),

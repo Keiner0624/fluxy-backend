@@ -15,6 +15,10 @@ public interface TeamInvitationRepository extends JpaRepository<TeamInvitation, 
     List<TeamInvitation> findByCompanyIdOrderByCreatedAtDesc(Long companyId);
     List<TeamInvitation> findByCompanyIdAndEmailIgnoreCase(Long companyId, String email);
 
+    @Query("SELECT COUNT(i) FROM TeamInvitation i WHERE i.companyId = :companyId AND i.acceptedAt IS NULL "
+            + "AND i.revokedAt IS NULL AND i.expiresAt > :now")
+    long countPending(@Param("companyId") Long companyId, @Param("now") java.time.Instant now);
+
     @Modifying
     @Query("DELETE FROM TeamInvitation i WHERE i.companyId = :companyId")
     void deleteByCompanyId(@Param("companyId") Long companyId);

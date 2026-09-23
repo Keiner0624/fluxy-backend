@@ -40,16 +40,12 @@ public class UserController {
     public MeResponse me(Authentication authentication) {
         User user = findUser(authentication);
 
-        Plan plan = (user.getCompany() != null && user.getCompany().getPlan() != null)
-                ? user.getCompany().getPlan() : Plan.FREE;
+        // Plan vigente: uno vencido vale Free aunque la tarea de fin de periodo no haya pasado.
+        Plan plan = com.fluxyBackend.billing.PlanCatalog.effectivePlan(user.getCompany());
+        int limit = com.fluxyBackend.billing.PlanCatalog.info(plan).productLimit();
+        int productLimit = limit == com.fluxyBackend.billing.PlanCatalog.UNLIMITED ? 999999 : limit;
 
-        int productLimit = switch (plan) {
-            case PRO      -> 100;
-            case BUSINESS -> 999999;
-            default       -> 10;
-        };
-
-        LocalDateTime expiresAt = user.getCompany() != null
+        LocalDateTime expiresAt = plan != Plan.FREE && user.getCompany() != null
                 ? user.getCompany().getPlanExpiresAt() : null;
 
         boolean hasUsedTrial = user.getCompany() != null && user.getCompany().isTrialUsed();

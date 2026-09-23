@@ -52,10 +52,7 @@ public class AIController {
         User user = userRepository.findByEmailIgnoreCase(authentication.getName())
                 .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
 
-        Plan plan = user.getCompany() != null && user.getCompany().getPlan() != null
-                ? user.getCompany().getPlan() : Plan.FREE;
-
-        if (plan != Plan.BUSINESS) {
+        if (!com.fluxyBackend.billing.PlanCatalog.has(user.getCompany(), com.fluxyBackend.billing.Feature.AI_DESCRIPTIONS)) {
             return ResponseEntity.status(403).body(
                     Map.of("message", "El generador de IA es exclusivo del plan Business.")
             );

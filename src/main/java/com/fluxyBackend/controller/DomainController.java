@@ -62,7 +62,7 @@ public class DomainController {
         Company company = user.getCompany();
 
         // Solo plan BUSINESS
-        if (company.getPlan() == null || company.getPlan() != Plan.BUSINESS) {
+        if (!com.fluxyBackend.billing.PlanCatalog.has(company, com.fluxyBackend.billing.Feature.CUSTOM_DOMAIN)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
                     "message", "El dominio personalizado es exclusivo del plan Business.",
                     "upgradeRequired", true

@@ -52,12 +52,6 @@ public class ProductService {
                 .orElseThrow(() -> new NotFoundException("User not found"));
     }
 
-    private static final Map<Company.Plan, Integer> PLAN_LIMITS = Map.of(
-            Company.Plan.FREE, 10,
-            Company.Plan.PRO, 100,
-            Company.Plan.BUSINESS, 999999
-    );
-
     // ─── Alta y edición ───────────────────────────────────────────────────────
 
     @Transactional
@@ -70,11 +64,12 @@ public class ProductService {
         product.setSku(uniqueSku(company.getId(), product.getSku(), null));
         product.setCreatedAt(null);
 
-        Company.Plan plan = (company.getPlan() != null) ? company.getPlan() : Company.Plan.FREE;
-        int limit = PLAN_LIMITS.get(plan);
+        Company.Plan plan = com.fluxyBackend.billing.PlanCatalog.effectivePlan(company);
+        int limit = com.fluxyBackend.billing.PlanCatalog.info(plan).productLimit();
         int current = prodcutRepository.countByCompany(company);
 
-        if (current >= limit) {
+        // Con un plan vencido o inferior no se borra nada: solo no se pueden crear más.
+        if (limit != com.fluxyBackend.billing.PlanCatalog.UNLIMITED && current >= limit) {
             throw new ProductLimitException(limit, current, plan.name());
         }
         Prodcut saved = prodcutRepository.save(product);

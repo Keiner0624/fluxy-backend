@@ -50,7 +50,8 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             Pattern.compile("^/orders/?$"),
             Pattern.compile("^/payments/?$"),
             Pattern.compile("^/payments/\\d+/refund$"),
-            Pattern.compile("^/payments/create-preference$"));
+            Pattern.compile("^/payments/create-preference$"),
+            Pattern.compile("^/billing/subscription/(checkout|cancel|reactivate|trial)$"));
 
     private final IdempotencyRecordRepository repository;
     private final TransactionTemplate transactions;

@@ -39,6 +39,8 @@ public class CompanyController {
     private final EmailService       emailService;
     private final com.fluxyBackend.security.access.AccessService accessService;
     private final com.fluxyBackend.service.AuditService auditService;
+    private final com.fluxyBackend.billing.EntitlementService entitlements;
+    private final com.fluxyBackend.billing.SubscriptionService subscriptionService;
 
     // ─── Crear empresa ───────────────────────────────────────────────────────
     @Operation(summary = "Crear una empresa",
@@ -79,8 +81,11 @@ public class CompanyController {
             company.setEmail(config.email().strip());
         if (config.logoUrl() != null)
             company.setLogoUrl(config.logoUrl().isBlank() ? null : config.logoUrl().strip());
-        if (config.storeStyle() != null)
+        if (config.storeStyle() != null && !config.storeStyle().equals(company.getStoreStyle())) {
+            // El estilo es del plan Pro; el guardado se conserva si el plan vence.
+            entitlements.require(company, com.fluxyBackend.billing.Feature.CUSTOM_STYLE);
             company.setStoreStyle(config.storeStyle());
+        }
         if (config.primaryColor() != null)
             company.setPrimaryColor(config.primaryColor());
         if (config.paymentMethods() != null)
@@ -121,51 +126,19 @@ public class CompanyController {
             description = "Activa PRO por un mes una sola vez por empresa. Requiere plan FREE; responde 400 si ya existe un plan activo o se usó la prueba.")
     @PostMapping("/trial")
     @RequirePermission(Permission.BILLING_MANAGE)
-    public ResponseEntity<Map<String, Object>> activateTrial(Authentication authentication) {
-        User user = userRepository.findByEmailIgnoreCase(authentication.getName())
-                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
-
-        Company company = user.getCompany();
-
-        // Verificar que no haya usado el trial antes
-        if (company.isTrialUsed()) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", "Ya utilizaste tu período de prueba gratuito."
-            ));
-        }
-
-        // Verificar que esté en plan FREE
-        if (company.getPlan() != Plan.FREE) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", "Ya tienes un plan activo."
-            ));
-        }
-
-        // Activar PRO por 1 mes
-        java.time.LocalDateTime expiresAt = java.time.LocalDateTime.now().plusMonths(1);
-        company.setPlan(Plan.PRO);
-        company.setPlanActivatedAt(java.time.LocalDateTime.now());
-        company.setPlanExpiresAt(expiresAt);
-        company.setTrialUsed(true);
-        companyRepository.save(company);
-        auditService.record(company.getId(), user, com.fluxyBackend.service.AuditAction.PLAN_CHANGED, "COMPANY",
-                company.getId(), Map.of("from", "FREE", "to", "PRO", "by", "TRIAL"));
-
-        // Enviar email de confirmación
+    public ResponseEntity<Map<String, Object>> activateTrial() {
+        // La prueba es una suscripción TRIALING: vence y pasa a Free como cualquier otra.
         try {
-            emailService.sendTrialActivatedEmail(user.getEmail(), user.getFullName(), expiresAt);
-        } catch (Exception e) {
-            log.error("Error enviando email de trial a {}", user.getEmail(), e);
+            var view = subscriptionService.startTrial(accessService.current());
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "¡Tu prueba gratuita de 1 mes está activa!",
+                    "plan", view.plan(),
+                    "expiresAt", String.valueOf(view.paidUntil())
+            ));
+        } catch (com.fluxyBackend.exception.BusinessException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
         }
-
-        return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "¡Tu prueba gratuita de 1 mes está activa!",
-                "plan", "PRO",
-                "expiresAt", expiresAt.toString()
-        ));
     }
 
 }

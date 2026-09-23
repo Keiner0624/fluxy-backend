@@ -44,6 +44,7 @@ public class DashboardController {
     private final UserRepository  userRepository;
     private final AnalyticsService analyticsService;
     private final AccessService accessService;
+    private final com.fluxyBackend.billing.EntitlementService entitlements;
 
     @Operation(summary = "Resumen del negocio",
             description = "Ventas de hoy y del mes contra el período anterior, pedidos pendientes, ticket promedio, "
@@ -62,7 +63,9 @@ public class DashboardController {
     public AnalyticsService.Metrics metrics(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return analyticsService.metrics(accessService.current().companyId(), from, to);
+        var member = accessService.current();
+        entitlements.require(member.company(), com.fluxyBackend.billing.Feature.METRICS);
+        return analyticsService.metrics(member.companyId(), from, to);
     }
 
     @Operation(summary = "Consultar los indicadores de mi tienda",

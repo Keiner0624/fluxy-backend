@@ -27,7 +27,7 @@ public class PermissionInterceptor implements HandlerInterceptor {
     private static final Set<String> MUTATING = Set.of("POST", "PUT", "PATCH", "DELETE");
     /** Rutas que no son actividad de negocio y que siguen disponibles con la tienda archivada. */
     private static final List<String> ACCOUNT_PATHS = List.of("/me/", "/company-account/", "/users/me",
-            "/payments/create-preference", "/companies/trial", "/push/");
+            "/payments/create-preference", "/companies/trial", "/push/", "/billing/");
 
     private final AccessService accessService;
     private final RateLimitService rateLimitService;

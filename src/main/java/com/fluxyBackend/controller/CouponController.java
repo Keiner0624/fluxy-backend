@@ -144,6 +144,9 @@ public class CouponController {
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
 
+        if (!com.fluxyBackend.billing.PlanCatalog.has(company, com.fluxyBackend.billing.Feature.COUPONS)) {
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "error", "Este cupón no está disponible."));
+        }
         Coupon coupon = couponRepository.findByCodeIgnoreCaseAndCompany(code, company)
                 .orElse(null);
 

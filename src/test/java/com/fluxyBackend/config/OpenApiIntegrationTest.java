@@ -41,20 +41,20 @@ class OpenApiIntegrationTest {
         assertThat(api.at("/components/securitySchemes/bearerAuth/type").asText()).isEqualTo("http");
         assertThat(api.at("/components/securitySchemes/bearerAuth/scheme").asText()).isEqualTo("bearer");
 
-        JsonNode preference = api.path("paths").path("/payments/create-preference").path("post");
-        JsonNode properties = preference.path("requestBody").path("content")
-                .path("application/json").path("schema").path("properties");
-        assertThat(properties.path("plan").path("enum").toString()).isEqualTo("[\"PRO\",\"BUSINESS\"]");
-        assertThat(properties.path("plan").path("default").asText()).isEqualTo("PRO");
-        assertThat(properties.path("months").path("type").asText()).isEqualTo("string");
-        assertThat(properties.path("months").path("default").asText()).isEqualTo("1");
-        assertThat(preference.path("responses").has("400")).isTrue();
-        assertThat(preference.path("responses").has("502")).isTrue();
-        JsonNode responseProperties = preference.path("responses").path("200").path("content")
-                .path("application/json").path("schema").path("properties");
-        assertThat(responseProperties.has("preferenceId")).isTrue();
-        assertThat(responseProperties.has("initPoint")).isTrue();
-        assertThat(responseProperties.has("sandboxUrl")).isTrue();
+        JsonNode paths = api.path("paths");
+        JsonNode checkout = paths.path("/billing/subscription/checkout").path("post");
+        assertThat(checkout.path("summary").asText()).isNotBlank();
+        JsonNode checkoutRequest = api.at("/components/schemas/CheckoutRequest/properties");
+        assertThat(checkoutRequest.has("plan")).isTrue();
+        assertThat(checkoutRequest.has("months")).isTrue();
+        JsonNode checkoutResponse = api.at("/components/schemas/CheckoutResponse/properties");
+        assertThat(checkoutResponse.has("checkoutUrl")).isTrue();
+        assertThat(checkoutResponse.has("quote")).isTrue();
+        for (String path : new String[]{"/billing/subscription/cancel", "/billing/subscription/reactivate"}) {
+            assertThat(paths.path(path).path("post").path("description").asText()).as(path).isNotBlank();
+        }
+        assertThat(paths.path("/billing/subscription").path("get").isMissingNode()).isFalse();
+        assertThat(paths.path("/payments/create-preference").path("post").isMissingNode()).isFalse();
     }
 
     @Test

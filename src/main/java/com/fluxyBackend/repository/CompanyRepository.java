@@ -19,6 +19,8 @@ public interface CompanyRepository extends JpaRepository<Company,Long> {
     @Query("SELECT c FROM Company c WHERE c.id = :id")
     Optional<Company> findByIdForUpdate(@Param("id") Long id);
 
+    List<Company> findByPlanNot(Company.Plan plan);
+
     //Planes vencidos - para el scheduler
     @Query("SELECT c FROM Company c WHERE c.plan <> :freePlan AND c.planExpiresAt IS NOT NULL AND c.planExpiresAt < :now ")
     List<Company> findExpiredPlans(@Param("freePlan")Company.Plan freePlan, @Param("now") java.time.LocalDateTime now);
