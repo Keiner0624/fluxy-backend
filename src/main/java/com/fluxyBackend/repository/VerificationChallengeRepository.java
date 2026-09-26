@@ -32,6 +32,8 @@ public interface VerificationChallengeRepository extends JpaRepository<Verificat
                                          @Param("type") VerificationChallenge.Type type);
 
     /** Solo esa columna: guardar la entidad entera pisaría intentos o consumos hechos mientras tanto. */
+    // Se llama desde el envío asíncrono, fuera de toda transacción: abre la suya.
+    @org.springframework.transaction.annotation.Transactional
     @Modifying
     @Query("UPDATE VerificationChallenge c SET c.deliveryFailedAt = :at WHERE c.id = :id")
     int markDeliveryFailed(@Param("id") Long id, @Param("at") java.time.LocalDateTime at);

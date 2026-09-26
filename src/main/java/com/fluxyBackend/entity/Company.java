@@ -30,9 +30,12 @@ public class Company {
     @Column(unique = true)
     private String slug;
     private String phone;
+    @Column(length = 300)
     private String address;
+    @Column(length = 2000)
     private String description;
     private String primaryColor;
+    @Column(length = 2048)
     private String logoUrl;
     @Column(columnDefinition = "TEXT")
     private String storeStyle;

@@ -19,6 +19,7 @@ public class Order {
     private Long id;
     private String customerName;
     private String customerPhone;
+    @Column(length = 300)
     private String customerAddress;
     private Double total;
     private LocalDateTime createdAt;
