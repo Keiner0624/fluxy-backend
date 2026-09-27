@@ -54,6 +54,7 @@ public class TeamService {
     private final SessionService sessionService;
     private final EmailService emailService;
     private final AuditService auditService;
+    private final com.fluxyBackend.billing.EntitlementService entitlements;
 
     @Value("${app.frontend_url:http://localhost:5173}")
     private String frontendUrl;
@@ -116,6 +117,9 @@ public class TeamService {
 
     @Transactional
     public InviteResult invite(Member actor, InviteRequest request) {
+        // Sumar personas es del plan Pro. Gestionar a las que ya están (roles, suspender, quitar)
+        // sigue disponible siempre: al bajar de plan el dueño tiene que poder recortar accesos.
+        entitlements.require(actor.company(), com.fluxyBackend.billing.Feature.TEAM);
         String email = normalizeEmail(request.email());
         MemberRole role = assignableRole(request.role());
         ensureCanAssign(actor, role);
@@ -178,6 +182,9 @@ public class TeamService {
                 .filter(TeamInvitation::isPending)
                 .orElseThrow(() -> new BusinessException(HttpStatus.GONE, "INVITATION_INVALID",
                         "La invitación no es válida o ya venció. Pedile a quien te invitó que la reenvíe."));
+        // Una invitación enviada con plan Pro no se puede aceptar si el negocio ya bajó a Free.
+        companyRepository.findById(invitation.getCompanyId())
+                .ifPresent(company -> entitlements.require(company, com.fluxyBackend.billing.Feature.TEAM));
         String fullName = request.fullName() == null ? "" : request.fullName().strip().replaceAll("\\s+", " ");
         if (fullName.length() < 2 || fullName.length() > 150) throw new BusinessException("Ingresá tu nombre completo.");
         PasswordPolicy.validate(request.password(), invitation.getEmail());

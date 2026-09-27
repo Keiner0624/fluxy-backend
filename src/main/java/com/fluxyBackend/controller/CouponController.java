@@ -40,6 +40,7 @@ public class CouponController {
     private final UserRepository    userRepository;
     private final CompanyRepository companyRepository;
     private final com.fluxyBackend.service.AuditService auditService;
+    private final com.fluxyBackend.billing.EntitlementService entitlements;
 
     private User getUser(Authentication auth) {
         return userRepository.findByEmailIgnoreCase(auth.getName())
@@ -65,6 +66,7 @@ public class CouponController {
     public ResponseEntity<?> create(@Valid @RequestBody CreateCouponRequest request, Authentication auth) {
         User user = getUser(auth);
         Company company = user.getCompany();
+        entitlements.require(company, com.fluxyBackend.billing.Feature.COUPONS);
 
         String code = request.code.trim().toUpperCase(Locale.ROOT);
 
@@ -105,6 +107,8 @@ public class CouponController {
                 .filter(c -> c.getCompany().getId().equals(user.getCompany().getId()))
                 .orElseThrow(() -> new NotFoundException("Cupón no encontrado"));
 
+        // Desactivar siempre se puede; activar pide el plan con cupones.
+        if (!coupon.isActive()) entitlements.require(user.getCompany(), com.fluxyBackend.billing.Feature.COUPONS);
         coupon.setActive(!coupon.isActive());
         return ResponseEntity.ok(couponRepository.save(coupon));
     }

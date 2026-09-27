@@ -5,6 +5,7 @@ public enum Feature {
     METRICS("Métricas"),
     REPORTS("Reportes"),
     COUPONS("Cupones"),
+    TEAM("Equipo con roles y permisos"),
     CUSTOM_STYLE("Estilo de la tienda"),
     WHATSAPP("Pedidos por WhatsApp"),
     CUSTOM_DOMAIN("Dominio personalizado"),

@@ -31,7 +31,7 @@ public final class PlanCatalog {
     }
 
     private static final Set<Feature> PRO_FEATURES = EnumSet.of(
-            Feature.METRICS, Feature.REPORTS, Feature.COUPONS, Feature.CUSTOM_STYLE, Feature.WHATSAPP,
+            Feature.METRICS, Feature.REPORTS, Feature.COUPONS, Feature.TEAM, Feature.CUSTOM_STYLE, Feature.WHATSAPP,
             Feature.MARKETING_FULL_ANALYTICS, Feature.MARKETING_ADVANCED_SEGMENTS, Feature.MARKETING_CUSTOM_QR,
             Feature.ELECTRONIC_INVOICING);
     private static final Set<Feature> BUSINESS_FEATURES = union(PRO_FEATURES,
