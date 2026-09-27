@@ -60,6 +60,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .requestMatchers("/payments/webhook").permitAll()
+                        // Avisos de proveedores de facturación: se autentican con la firma HMAC.
+                        .requestMatchers(HttpMethod.POST, "/webhooks/invoicing/**").permitAll()
                         .requestMatchers("/coupons/validate").permitAll()
                         .requestMatchers(HttpMethod.GET, "/complaints/provider").permitAll()
                         .requestMatchers(HttpMethod.POST, "/complaints").permitAll()

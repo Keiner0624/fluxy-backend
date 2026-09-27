@@ -40,6 +40,7 @@ public class OrderPaymentService {
     private final OrderPaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
     private final BusinessClock clock;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     public record PaymentView(Long id, Long orderId, String status, String provider, String method, double amount,
                               double refundedAmount, double netAmount, String currency, String providerReference,
@@ -198,7 +199,9 @@ public class OrderPaymentService {
         payment.setNote(trim(request.note(), 300));
         payment.setCreatedBy(member.displayName());
         if (status == Status.APPROVED) payment.setApprovedAt(LocalDateTime.now());
-        return view(paymentRepository.save(payment), order);
+        PaymentView saved = view(paymentRepository.save(payment), order);
+        if (status == Status.APPROVED) events.publishEvent(new PaymentApprovedEvent(order.getId(), member.companyId()));
+        return saved;
     }
 
     @Transactional
@@ -221,6 +224,7 @@ public class OrderPaymentService {
                     }
                     ensureNotOverpaid(order, payment.getAmount());
                     payment.setApprovedAt(LocalDateTime.now());
+                    events.publishEvent(new PaymentApprovedEvent(order.getId(), member.companyId()));
                 }
                 payment.setStatus(target);
             }

@@ -13,7 +13,8 @@ public enum Feature {
     MARKETING_FULL_ANALYTICS("Analítica completa de campañas"),
     MARKETING_ADVANCED_SEGMENTS("Segmentos avanzados de clientes"),
     MARKETING_CUSTOM_QR("QR de campaña personalizado"),
-    MARKETING_EXPORT("Exportación de resultados de campañas");
+    MARKETING_EXPORT("Exportación de resultados de campañas"),
+    ELECTRONIC_INVOICING("Facturación electrónica");
 
     private final String label;
 

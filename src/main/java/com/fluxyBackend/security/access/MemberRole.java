@@ -36,7 +36,8 @@ public enum MemberRole {
                     COUPON_VIEW, COUPON_MANAGE,
                     REPORT_VIEW, REPORT_EXPORT,
                     TEAM_VIEW, INTEGRATION_VIEW,
-                    MARKETING_VIEW, MARKETING_CREATE, MARKETING_EDIT, MARKETING_PUBLISH, MARKETING_ANALYTICS);
+                    MARKETING_VIEW, MARKETING_CREATE, MARKETING_EDIT, MARKETING_PUBLISH, MARKETING_ANALYTICS,
+                    INVOICE_VIEW, INVOICE_CREATE, INVOICE_RESEND, INVOICE_CREDIT_NOTE);
             case SELLER -> EnumSet.of(
                     PRODUCT_VIEW,
                     ORDER_VIEW, ORDER_UPDATE, ORDER_CANCEL,
@@ -44,7 +45,8 @@ public enum MemberRole {
                     PAYMENT_VIEW, PAYMENT_UPDATE,
                     INVENTORY_VIEW,
                     COUPON_VIEW,
-                    MARKETING_VIEW);
+                    MARKETING_VIEW,
+                    INVOICE_VIEW, INVOICE_CREATE, INVOICE_RESEND);
             case WAREHOUSE -> EnumSet.of(
                     PRODUCT_VIEW,
                     ORDER_VIEW, ORDER_UPDATE,
@@ -52,7 +54,7 @@ public enum MemberRole {
             case VIEWER -> EnumSet.of(
                     PRODUCT_VIEW, ORDER_VIEW, CUSTOMER_VIEW, PAYMENT_VIEW,
                     INVENTORY_VIEW, COUPON_VIEW, REPORT_VIEW,
-                    MARKETING_VIEW);
+                    MARKETING_VIEW, INVOICE_VIEW);
         };
     }
 

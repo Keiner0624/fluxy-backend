@@ -35,6 +35,7 @@ public class StoreController {
     private final OrderService orderService;
     private final IntegrationService integrationService;
     private final CompanyLifecycleService lifecycleService;
+    private final com.fluxyBackend.invoicing.service.InvoicingConfigurationService invoicing;
 
     // ─── Catálogo público de productos ───────────────────────────────────────
     @Operation(summary = "Listar productos por empresa",
@@ -64,7 +65,7 @@ public class StoreController {
     @GetMapping("/{companyId}/info")
     public PublicStoreResponse getCompanyInfo(@PathVariable Long companyId) {
         Company company = byId(companyId);
-        return PublicStoreResponse.from(company, integrationService.settings(company.getId()));
+        return info(company);
     }
 
     // ─── Por slug ─────────────────────────────────────────────────────────────
@@ -73,7 +74,7 @@ public class StoreController {
     @GetMapping("/slug/{slug}/info")
     public PublicStoreResponse getBySlug(@PathVariable String slug) {
         Company company = bySlug(slug);
-        return PublicStoreResponse.from(company, integrationService.settings(company.getId()));
+        return info(company);
     }
 
     @Operation(summary = "Listar productos por slug",
@@ -95,6 +96,13 @@ public class StoreController {
         Order order = orderService.createOrderAsClient(request, company);
         lifecycleService.recordActivity(company.getId());
         return orderResponse(order, company);
+    }
+
+    private PublicStoreResponse info(Company company) {
+        PublicStoreResponse.InvoicingOptions options = invoicing.storeOptions(company)
+                .map(o -> new PublicStoreResponse.InvoicingOptions(o.receipt(), o.invoice(), o.test()))
+                .orElse(null);
+        return PublicStoreResponse.from(company, integrationService.settings(company.getId()), options);
     }
 
     /** Tiendas archivadas o por eliminarse no se muestran (410 STORE_OFFLINE). */

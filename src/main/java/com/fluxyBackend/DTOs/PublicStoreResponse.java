@@ -22,13 +22,21 @@ public record PublicStoreResponse(
         String metaPixelId,
         boolean whatsappEnabled,
         /* false mientras la tienda está suspendida: se ve el catálogo pero no se aceptan pedidos. */
-        boolean acceptingOrders
+        boolean acceptingOrders,
+        /* Comprobantes que el cliente puede pedir al comprar; null si la tienda no emite. */
+        InvoicingOptions invoicing
 ) {
+    public record InvoicingOptions(boolean receipt, boolean invoice, boolean test) {}
+
     public static PublicStoreResponse from(Company company) {
         return from(company, null);
     }
 
     public static PublicStoreResponse from(Company company, CompanyIntegrations integrations) {
+        return from(company, integrations, null);
+    }
+
+    public static PublicStoreResponse from(Company company, CompanyIntegrations integrations, InvoicingOptions invoicing) {
         return new PublicStoreResponse(
                 company.getId(),
                 company.getName(),
@@ -47,7 +55,8 @@ public record PublicStoreResponse(
                 integrations == null ? null : integrations.getGoogleAnalyticsId(),
                 integrations == null ? null : integrations.getMetaPixelId(),
                 integrations == null || integrations.isWhatsappEnabled(),
-                company.getStatus() != Company.Status.SUSPENDED
+                company.getStatus() != Company.Status.SUSPENDED,
+                invoicing
         );
     }
 }

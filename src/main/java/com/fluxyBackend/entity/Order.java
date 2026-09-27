@@ -39,6 +39,27 @@ public class Order {
     @Column(length = 300)
     private String cancelReason;
 
+    // ─── Comprobante pedido por el cliente (ya validado) ─────────────────────
+    /** BOLETA o FACTURA; null si no pidió comprobante al comprar. */
+    @Column(name = "invoice_type", length = 16)
+    private String invoiceType;
+
+    @Column(name = "buyer_document_type", length = 20)
+    private String buyerDocumentType;
+
+    @Column(name = "buyer_document_number", length = 15)
+    private String buyerDocumentNumber;
+
+    /** Razón social (factura) o nombre para la boleta. */
+    @Column(name = "buyer_legal_name", length = 200)
+    private String buyerLegalName;
+
+    @Column(name = "buyer_fiscal_address", length = 300)
+    private String buyerFiscalAddress;
+
+    @Column(name = "buyer_email", length = 150)
+    private String buyerEmail;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = true)
     @JsonIgnore

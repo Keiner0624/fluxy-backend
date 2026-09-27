@@ -45,6 +45,7 @@ Si el correo ya tiene cuenta, se vincula y entra solo cuando el proveedor garant
 |---|---|
 | API autenticada | 300 req/min por usuario |
 | Tienda pública | 240 lecturas/min, 15 pedidos/10 min y 120 eventos de campaña/min por IP |
+| Webhooks de facturación | 120/min por IP, además de la firma HMAC |
 | Registro y OAuth | 10/hora por IP |
 | Renovación de sesión | 60/min por IP |
 | Recuperación de contraseña | 10/hora por IP y 3/hora por correo (silencioso) |
@@ -145,3 +146,9 @@ El acceso por plan se decide en el servidor (`EntitlementService`); un plan venc
 `./mvnw verify` corre, entre otras, `SecurityBlueprintIntegrationTest` y `OidcTokenVerifierTest`: registro verificado, bloqueo y vencimiento de códigos, rotación y reutilización de refresh tokens, cierre de sesiones, tokens falsos, aislamiento entre negocios (IDOR), roles, desactivación, límites con `Retry-After`, tamaño máximo, asignación masiva, idempotencia, ciclo de vida con plan pago exento, identidad reciente para eliminar, recuperación de un solo uso y respuesta genérica, y validación OIDC (audiencia, emisor, nonce, vencimiento, firma ajena y algoritmo simétrico).
 
 Las pruebas usan H2. Hay que cubrir también con PostgreSQL real (Testcontainers) los bloqueos y el `CHECK` de stock cuando haya Docker en CI.
+
+## Facturación electrónica
+
+Credenciales de proveedores cifradas con AES-256-GCM (clave en `SECRETS_ENCRYPTION_KEY`, fuera de la base), habilitación
+fiscal calculada solo en el servidor, llamadas a proveedores restringidas a hosts permitidos (SSRF), archivos privados
+transmitidos por Fluxy y webhooks firmados con protección de replay. Detalle en `docs/INVOICING.md`.

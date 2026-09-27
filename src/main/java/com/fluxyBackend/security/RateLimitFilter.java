@@ -62,6 +62,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
         if (path.equals("/auth/refresh")) return RateLimitService.Bucket.REFRESH;
         if (path.equals("/complaints")) return RateLimitService.Bucket.COMPLAINT;
+        if (path.startsWith("/webhooks/")) return RateLimitService.Bucket.STORE_TRACKING;
         if (path.equals("/auth/forgot-password")) return RateLimitService.Bucket.PASSWORD_RESET_IP;
         return null;
     }

@@ -51,6 +51,7 @@ public class OrderService {
     private final OrderPaymentService paymentService;
     private final OrderItemRepository orderItemRepository;
     private final BusinessClock clock;
+    private final com.fluxyBackend.invoicing.service.InvoiceRequestNormalizer invoiceRequests;
 
 
     // ─── Vistas ───────────────────────────────────────────────────────────────
@@ -71,7 +72,11 @@ public class OrderService {
                               String customerAddress, double subtotal, double discount, String couponCode,
                               double total, String paymentMethod, String cancelReason, double paidAmount,
                               String paymentStatus, List<OrderItemView> items, List<StatusChangeView> history,
-                              List<OrderPaymentService.PaymentView> payments) {}
+                              List<OrderPaymentService.PaymentView> payments, InvoiceRequest invoiceRequest) {}
+
+    /** Comprobante que pidió el cliente al comprar (null si no pidió). */
+    public record InvoiceRequest(String type, String documentType, String documentNumber, String legalName,
+                                 String fiscalAddress, String email) {}
 
     public record StatusRequest(String status, String note) {}
 
@@ -152,6 +157,8 @@ public class OrderService {
         order.setItems(orderItems);
         order.setTotal(total);
         applyCoupon(request.couponCode, lockedCompany, order, total);
+        // Boleta o factura pedida al comprar: se valida ahora (RUC, DNI) y se guarda para emitirla después.
+        invoiceRequests.apply(order, request, lockedCompany);
         order.setCustomer(customerService.resolveForOrder(lockedCompany.getId(), request.customerName,
                 request.customerPhone, request.customerAddress));
 
@@ -279,6 +286,7 @@ public class OrderService {
         orderRepository.save(order);
         statusChangeRepository.save(new OrderStatusChange(order.getId(), member.companyId(), current, target,
                 note, member.displayName()));
+        eventPublisher.publishEvent(new OrderStatusChangedEvent(order.getId(), member.companyId(), target));
         return detail(member.companyId(), order.getId());
     }
 
@@ -377,7 +385,10 @@ public class OrderService {
                 order.getPaymentMethod(), order.getCancelReason(),
                 OrderPaymentService.round(OrderPaymentService.collected(payments)),
                 OrderPaymentService.paymentStatus(total, payments), items, history,
-                payments.stream().map(p -> OrderPaymentService.view(p, order)).toList());
+                payments.stream().map(p -> OrderPaymentService.view(p, order)).toList(),
+                order.getInvoiceType() == null && order.getBuyerEmail() == null ? null
+                        : new InvoiceRequest(order.getInvoiceType(), order.getBuyerDocumentType(), order.getBuyerDocumentNumber(),
+                        order.getBuyerLegalName(), order.getBuyerFiscalAddress(), order.getBuyerEmail()));
     }
 
     // ─── Generar URL de WhatsApp para el cliente (retornar al frontend) ───────

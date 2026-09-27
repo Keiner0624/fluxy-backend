@@ -67,4 +67,23 @@ public final class AuditAction {
     public static final String CAMPAIGN_FINISHED = "CAMPAIGN_FINISHED";
     public static final String CAMPAIGN_ARCHIVED = "CAMPAIGN_ARCHIVED";
     public static final String CAMPAIGN_DELETED = "CAMPAIGN_DELETED";
+
+    // Facturación electrónica
+    public static final String INVOICING_SETTINGS_UPDATED = "INVOICING_SETTINGS_UPDATED";
+    public static final String INVOICING_PROVIDER_CHANGED = "INVOICING_PROVIDER_CHANGED";
+    public static final String INVOICING_CONNECTION_TESTED = "INVOICING_CONNECTION_TESTED";
+    public static final String INVOICING_ACTIVATION_CHANGED = "INVOICING_ACTIVATION_CHANGED";
+    public static final String TAX_PROFILE_VERIFICATION_STARTED = "TAX_PROFILE_VERIFICATION_STARTED";
+    public static final String TAX_PROFILE_VERIFIED = "TAX_PROFILE_VERIFIED";
+    public static final String TAX_PROFILE_REJECTED = "TAX_PROFILE_REJECTED";
+    public static final String TAX_PROFILE_SUSPENDED = "TAX_PROFILE_SUSPENDED";
+    public static final String INVOICE_SERIES_CHANGED = "INVOICE_SERIES_CHANGED";
+    public static final String INVOICE_CREATED = "INVOICE_CREATED";
+    public static final String INVOICE_ACCEPTED = "INVOICE_ACCEPTED";
+    public static final String INVOICE_REJECTED = "INVOICE_REJECTED";
+    public static final String INVOICE_FAILED = "INVOICE_FAILED";
+    public static final String INVOICE_RETRIED = "INVOICE_RETRIED";
+    public static final String INVOICE_EMAIL_RESENT = "INVOICE_EMAIL_RESENT";
+    public static final String INVOICE_PUBLIC_LINK_REVOKED = "INVOICE_PUBLIC_LINK_REVOKED";
+    public static final String CREDIT_NOTE_CREATED = "CREDIT_NOTE_CREATED";
 }

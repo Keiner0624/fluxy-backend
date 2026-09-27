@@ -15,7 +15,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(permissionInterceptor)
-                .excludePathPatterns("/auth/**", "/store/**", "/payments/webhook", "/coupons/validate",
+                .excludePathPatterns("/auth/**", "/store/**", "/payments/webhook", "/webhooks/**", "/coupons/validate",
                         "/actuator/**", "/error", "/swagger-ui/**", "/v3/api-docs/**");
     }
 }

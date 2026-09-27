@@ -38,4 +38,22 @@ public class CreateOrderRequest {
     @Schema(description = "Id anónimo del navegador que llegó por un enlace de campaña; solo en la tienda pública. "
             + "El servidor atribuye el pedido a la última campaña vigente que vio esa sesión.")
     public String marketingSessionId;
+
+    // ─── Comprobante electrónico (opcional) ──────────────────────────────────
+    @jakarta.validation.constraints.Pattern(regexp = "^(BOLETA|FACTURA)?$", message = "debe ser BOLETA o FACTURA")
+    @Schema(description = "Comprobante que pide el cliente; solo se usa si la tienda emite comprobantes.", example = "BOLETA")
+    public String invoiceType;
+    @Size(max = 20)
+    @Schema(description = "DNI, RUC, CARNET_EXTRANJERIA, PASAPORTE o NINGUNO.", example = "DNI")
+    public String buyerDocumentType;
+    @Size(max = 15)
+    public String buyerDocumentNumber;
+    @Size(max = 200)
+    @Schema(description = "Razón social (factura) o nombre para la boleta.")
+    public String buyerLegalName;
+    @Size(max = 300)
+    public String buyerFiscalAddress;
+    @Size(max = 150)
+    @Schema(description = "Correo para recibir el comprobante.")
+    public String buyerEmail;
 }

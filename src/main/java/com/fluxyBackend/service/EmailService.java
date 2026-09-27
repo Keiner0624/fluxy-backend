@@ -57,8 +57,21 @@ public class EmailService {
     }
 
     // ─── Método base para enviar emails ──────────────────────────────────────
+    /** Archivo adjunto (comprobantes electrónicos). */
+    public record Attachment(String fileName, String contentType, byte[] content) {}
+
+    /** Correo con adjuntos. @return true si SendGrid lo aceptó. */
+    public boolean sendWithAttachments(String toEmail, String toName, String subject, String html,
+                                       java.util.List<Attachment> attachments) {
+        return send(toEmail, toName, subject, html, attachments);
+    }
+
     /** @return true si SendGrid aceptó el correo. */
     private boolean send(String toEmail, String toName, String subject, String html) {
+        return send(toEmail, toName, subject, html, java.util.List.of());
+    }
+
+    private boolean send(String toEmail, String toName, String subject, String html, java.util.List<Attachment> attachments) {
         if (!isConfigured()) {
             log.warn("SendGrid no configurado. No se envió el correo \"{}\"", subject);
             return false;
@@ -72,6 +85,14 @@ public class EmailService {
             Email to      = new Email(toEmail, toName);
             Content content = new Content("text/html", html);
             Mail mail = new Mail(from, subject, to, content);
+            for (Attachment attachment : attachments) {
+                com.sendgrid.helpers.mail.objects.Attachments file = new com.sendgrid.helpers.mail.objects.Attachments();
+                file.setContent(java.util.Base64.getEncoder().encodeToString(attachment.content()));
+                file.setType(attachment.contentType());
+                file.setFilename(attachment.fileName());
+                file.setDisposition("attachment");
+                mail.addAttachments(file);
+            }
 
             Request req = new Request();
             req.setMethod(Method.POST);
@@ -231,6 +252,16 @@ public class EmailService {
 
     @Value("${app.frontend_url:http://localhost:5173}")
     private String frontendUrl;
+
+    /** Cuerpo del correo de un comprobante electrónico que el negocio le manda a su cliente. */
+    public static String documentHtml(String issuer, String typeLabel, String number, String total, String link, boolean test) {
+        String button = link == null ? "" : "<a href=\"" + escape(link) + "\" style=\"display:inline-block; margin-top:14px; background:#1769e0; color:#ffffff; padding:11px 20px; border-radius:10px; font-weight:600; font-size:14px; text-decoration:none;\">Ver comprobante</a>";
+        String text = escape(issuer) + " te envía tu " + escape(typeLabel.toLowerCase()) + " <b>" + escape(number) + "</b> por " + escape(total)
+                + ". Adjuntamos el PDF; también podés verlo en línea."
+                + (test ? "<br><br><b>Documento de prueba: no tiene valor tributario.</b>" : "");
+        return securityLayout(typeLabel + " " + number, text, button,
+                "Recibís este correo porque hiciste una compra en " + escape(issuer) + ". Fluxy lo envía en su nombre.");
+    }
 
     private static String securityLayout(String title, String text, String extraHtml, String footer) {
         return """

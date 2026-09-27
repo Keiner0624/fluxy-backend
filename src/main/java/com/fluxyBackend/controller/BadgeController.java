@@ -50,6 +50,7 @@ public class BadgeController {
     private final CustomerRepository customers;
     private final ProductRepository products;
     private final CouponRepository coupons;
+    private final com.fluxyBackend.invoicing.repository.ElectronicDocumentRepository electronicDocuments;
     private final TeamInvitationRepository invitations;
     private final AuditLogRepository auditLogs;
     private final SubscriptionService subscriptions;
@@ -83,6 +84,9 @@ public class BadgeController {
         if (member.can(Permission.COUPON_VIEW) && PlanCatalog.has(member.company(), Feature.COUPONS)) {
             LocalDateTime now = LocalDateTime.now();
             badges.put("coupons", coupons.countExpiringBetween(companyId, now, now.plusDays(3)));
+        }
+        if (member.can(Permission.INVOICE_VIEW)) {
+            badges.put("invoices", electronicDocuments.countNeedingAttention(companyId, LocalDateTime.now().minusDays(7)));
         }
         if (member.can(Permission.TEAM_VIEW)) {
             badges.put("team", invitations.countPending(companyId, Instant.now()));

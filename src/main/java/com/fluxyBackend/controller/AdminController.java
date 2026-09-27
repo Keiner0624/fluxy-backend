@@ -293,6 +293,12 @@ public class AdminController {
                 .setParameter("companyId", companyId).executeUpdate();
         entityManager.createQuery("DELETE FROM MarketingCampaign c WHERE c.companyId = :companyId")
                 .setParameter("companyId", companyId).executeUpdate();
+        // Configuración fiscal y credenciales cifradas del proveedor. Los comprobantes emitidos se
+        // conservan: son documentos tributarios con plazo legal de conservación.
+        for (String entity : List.of("InvoicingConfiguration", "TaxProfile", "DocumentSeries")) {
+            entityManager.createQuery("DELETE FROM " + entity + " e WHERE e.companyId = :companyId")
+                    .setParameter("companyId", companyId).executeUpdate();
+        }
         entityManager.createQuery("DELETE FROM PushSubscription p WHERE p.user.id IN "
                         + "(SELECT u.id FROM User u WHERE u.company.id = :companyId)")
                 .setParameter("companyId", companyId).executeUpdate();

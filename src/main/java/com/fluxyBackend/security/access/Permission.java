@@ -19,6 +19,10 @@ public enum Permission {
     INTEGRATION_VIEW, INTEGRATION_MANAGE,
     /** Marketing: ver campañas, crearlas, editarlas, publicarlas (activar, pausar, finalizar) y ver resultados. */
     MARKETING_VIEW, MARKETING_CREATE, MARKETING_EDIT, MARKETING_PUBLISH, MARKETING_ANALYTICS,
+    /** Comprobantes electrónicos: ver, emitir, reenviar por correo y emitir notas de crédito. */
+    INVOICE_VIEW, INVOICE_CREATE, INVOICE_RESEND, INVOICE_CREDIT_NOTE,
+    /** Configuración fiscal (RUC, proveedor, credenciales, activación) y series. */
+    INVOICING_CONFIGURE, INVOICING_SERIES,
     /** Configuración, estilo y dominio de la tienda. */
     SETTINGS_MANAGE,
     /** Registro de actividad del negocio. */
