@@ -47,11 +47,13 @@ public class CampaignLinkBuilder {
         params.put("utm_medium", channel.utmMedium());
         params.put("utm_campaign", campaign.getTrackingCode());
 
-        String path = "/store/" + encode(company.getSlug());
+        // Con dominio propio activo, el enlace va a mitienda.com; si no, a la tienda en Fluxy.
+        String domain = company.getStoreDomain();
+        String path = domain != null ? "/" : "/store/" + encode(company.getSlug());
         String query = "?" + params.entrySet().stream()
                 .map(e -> e.getKey() + "=" + encode(e.getValue()))
                 .collect(Collectors.joining("&"));
-        String url = storeBaseUrl + path + query;
+        String url = (domain != null ? "https://" + domain : storeBaseUrl) + path + query;
         String text = text(campaign, company, targetName, url);
         ChannelPublisher publisher = channels.forChannel(channel);
         return new CampaignLink(channel.name(), url, path, query, text,

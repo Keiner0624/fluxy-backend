@@ -47,7 +47,23 @@ public class Company {
 
     // ─── Campos nuevos de plan ───────────────────────────────────────────────
     // ─── Dominio personalizado (plan BUSINESS) ───────────────────────────────
+    /** Dominio propio, sin www (www.dominio redirige a este). Único entre empresas. */
     private String customDomain;
+
+    /** Última consulta a Vercel (CustomDomainJobs la repite mientras no esté activo). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "custom_domain_status", length = 30)
+    private com.fluxyBackend.domain.CustomDomainStatus customDomainStatus;
+
+    /** true si es un dominio raíz (mitienda.com), false si es un subdominio (tienda.midominio.com). */
+    @Column(name = "custom_domain_apex")
+    private Boolean customDomainApex;
+
+    @Column(name = "custom_domain_added_at")
+    private LocalDateTime customDomainAddedAt;
+
+    @Column(name = "custom_domain_checked_at")
+    private LocalDateTime customDomainCheckedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -140,6 +156,16 @@ public class Company {
 
     // ─── Getter/Setter customDomain ──────────────────────────────────────────
     public String getCustomDomain() { return customDomain; }
+
+    /**
+     * Dominio donde hoy se abre la tienda: el propio si está activo y el plan lo incluye; null si
+     * la tienda se sirve en la dirección de Fluxy. Lo usan el panel y los enlaces de campañas.
+     */
+    public String getStoreDomain() {
+        return customDomain != null && customDomainStatus == com.fluxyBackend.domain.CustomDomainStatus.ACTIVE
+                && com.fluxyBackend.billing.PlanCatalog.has(this, com.fluxyBackend.billing.Feature.CUSTOM_DOMAIN)
+                ? customDomain : null;
+    }
     public void setCustomDomain(String customDomain) { this.customDomain = customDomain; }
 
     // ─── Getters/Setters nuevos de plan ─────────────────────────────────────

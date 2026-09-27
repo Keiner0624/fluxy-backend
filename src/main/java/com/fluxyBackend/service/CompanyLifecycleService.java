@@ -61,6 +61,7 @@ public class CompanyLifecycleService {
     private final SecurityMonitor monitor;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
+    private final com.fluxyBackend.domain.CustomDomainService customDomains;
 
     private final Map<Long, Long> lastTouch = new ConcurrentHashMap<>();
 
@@ -76,7 +77,8 @@ public class CompanyLifecycleService {
     public CompanyLifecycleService(CompanyRepository companyRepository, MembershipRepository membershipRepository,
                                    UserRepository userRepository, SessionService sessionService,
                                    AuditService auditService, EmailService emailService, SecurityMonitor monitor,
-                                   JdbcTemplate jdbc, TransactionTemplate transactions) {
+                                   JdbcTemplate jdbc, TransactionTemplate transactions,
+                                   com.fluxyBackend.domain.CustomDomainService customDomains) {
         this.companyRepository = companyRepository;
         this.membershipRepository = membershipRepository;
         this.userRepository = userRepository;
@@ -86,6 +88,7 @@ public class CompanyLifecycleService {
         this.monitor = monitor;
         this.jdbc = jdbc;
         this.transactions = transactions;
+        this.customDomains = customDomains;
     }
 
     public record LifecycleView(String status, String reason, LocalDateTime lastBusinessActivityAt,
@@ -389,7 +392,7 @@ public class CompanyLifecycleService {
         company.setAddress(null);
         company.setDescription(null);
         company.setLogoUrl(null);
-        company.setCustomDomain(null);
+        customDomains.release(company);
         company.setSlug("deleted-" + id + "-" + Hashing.randomToken().substring(0, 6).toLowerCase(Locale.ROOT));
         company.setStatus(Status.ANONYMIZED);
         companyRepository.save(company);

@@ -52,6 +52,7 @@ public class AdminController {
     private final com.fluxyBackend.service.AuditService auditService;
     private final com.fluxyBackend.security.SessionService sessionService;
     private final com.fluxyBackend.billing.SubscriptionService subscriptionService;
+    private final com.fluxyBackend.domain.CustomDomainService customDomains;
 
     private void requireAdmin(Authentication auth) {
         String email      = auth.getName();
@@ -266,6 +267,8 @@ public class AdminController {
 
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new NotFoundException("Empresa no encontrada"));
+        // El dominio propio se quita de Vercel: si no, quedaría apuntando a una tienda que ya no existe.
+        customDomains.release(company);
 
         List<User> users = userRepository.findByCompanyId(companyId);
         for (User user : users) {

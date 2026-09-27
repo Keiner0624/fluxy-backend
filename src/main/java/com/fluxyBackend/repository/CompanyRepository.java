@@ -13,6 +13,7 @@ import java.util.Optional;
 public interface CompanyRepository extends JpaRepository<Company,Long> {
     Optional<Company> findBySlug(String slug);
     Optional<Company> findByCustomDomain(String customDomain);
+    java.util.List<Company> findByCustomDomainIsNotNull();
     boolean existsBySlug(String slug);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

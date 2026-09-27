@@ -89,6 +89,11 @@ public class SchemaUpgrade implements ApplicationRunner {
         execute("CREATE INDEX IF NOT EXISTS idx_users_company ON users (company_id)");
         execute("CREATE INDEX IF NOT EXISTS idx_company_status ON company (status)");
         execute("CREATE INDEX IF NOT EXISTS idx_customers_company ON customers (company_id)");
+        // Un dominio propio pertenece a una sola tienda (los null no chocan entre sí).
+        execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_company_custom_domain ON company (custom_domain)");
+        // Dominios conectados antes de guardar su estado: se revisan en la próxima pasada.
+        execute("UPDATE company SET custom_domain_status = 'PENDING_DNS', custom_domain_added_at = CURRENT_TIMESTAMP "
+                + "WHERE custom_domain IS NOT NULL AND custom_domain_status IS NULL");
 
         // El stock nunca queda negativo: además de la validación, lo garantiza la base.
         if (isPostgres()) {
