@@ -9,6 +9,7 @@ import java.time.OffsetDateTime;
 public record MarketingOverview(OffsetDateTime from, OffsetDateTime to, CampaignMetrics totals,
                                 long liveCampaigns, int liveCampaignLimit, String plan, Capabilities capabilities) {
 
+    /** ai: el plan incluye textos generados con IA. */
     public record Capabilities(boolean fullAnalytics, boolean advancedSegments, boolean customQr, boolean export,
-                               boolean coupons) {}
+                               boolean coupons, boolean ai) {}
 }

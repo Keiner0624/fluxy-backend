@@ -106,7 +106,8 @@ public class CampaignService {
                 entitlements.has(company, Feature.MARKETING_ADVANCED_SEGMENTS),
                 entitlements.has(company, Feature.MARKETING_CUSTOM_QR),
                 entitlements.has(company, Feature.MARKETING_EXPORT),
-                entitlements.has(company, Feature.COUPONS));
+                entitlements.has(company, Feature.COUPONS),
+                entitlements.has(company, Feature.AI_DESCRIPTIONS));
     }
 
     @Transactional(readOnly = true)

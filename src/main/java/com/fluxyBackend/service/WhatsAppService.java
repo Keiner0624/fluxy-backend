@@ -17,18 +17,18 @@ public class WhatsAppService {
 
     private static final Logger log = LoggerFactory.getLogger(WhatsAppService.class);
 
-    // ─── Genera el mensaje de WhatsApp para el vendedor ──────────────────────
+    // Genera el mensaje de WhatsApp para el vendedor
     public String buildOrderMessage(Order order, Company company) {
         StringBuilder sb = new StringBuilder();
-        sb.append("🛒 *Nuevo pedido en ").append(company.getName()).append("*\n\n");
-        sb.append("📋 *Pedido #").append(order.getId()).append("*\n");
-        sb.append("👤 Cliente: ").append(order.getCustomerName()).append("\n");
+        sb.append("Nuevo pedido en ").append(company.getName()).append("*\n\n");
+        sb.append("Pedido # ").append(order.getId()).append("*\n");
+        sb.append("Cliente: ").append(order.getCustomerName()).append("\n");
 
         if (order.getCustomerPhone() != null && !order.getCustomerPhone().isBlank()) {
-            sb.append("📞 Teléfono: ").append(order.getCustomerPhone()).append("\n");
+            sb.append("Teléfono: ").append(order.getCustomerPhone()).append("\n");
         }
         if (order.getCustomerAddress() != null && !order.getCustomerAddress().isBlank()) {
-            sb.append("📍 Dirección: ").append(order.getCustomerAddress()).append("\n");
+            sb.append("Dirección: ").append(order.getCustomerAddress()).append("\n");
         }
 
         sb.append("\n*Productos:*\n");
@@ -42,12 +42,12 @@ public class WhatsAppService {
         }
 
         sb.append("\n💰 *Total: S/ ").append(String.format("%.2f", total)).append("*\n");
-        sb.append("\n_Enviado desde Fluxy_ 🚀");
+        sb.append("\n_Enviado desde Fluxy_ ");
 
         return sb.toString();
     }
 
-    // ─── Genera el link de WhatsApp (wa.me) ──────────────────────────────────
+    // Genera el link de WhatsApp (wa.me)
     public String buildWhatsAppUrl(String phone, String message) {
         // Limpiar el número: solo dígitos
         String cleanPhone = phone.replaceAll("[^0-9]", "");
@@ -65,7 +65,7 @@ public class WhatsAppService {
         }
     }
 
-    // ─── Enviar notificación via CallMeBot API (WhatsApp gratuito) ───────────
+    // Enviar notificación via CallMeBot API (WhatsApp gratuito)
     // Alternativa: simplemente loguear el link para que el vendedor lo use
     public void sendWhatsAppNotification(String phone, Order order, Company company) {
         if (phone == null || phone.isBlank()) {

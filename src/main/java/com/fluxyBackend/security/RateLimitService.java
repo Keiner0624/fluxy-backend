@@ -35,6 +35,8 @@ public class RateLimitService {
         PASSWORD_RESET_DESTINATION(3, Duration.ofHours(1)),
         /** Recuperación de contraseña, por IP. */
         PASSWORD_RESET_IP(10, Duration.ofHours(1)),
+        /** Textos generados con IA, por empresa: cada llamada tiene costo. */
+        AI_GENERATION(60, Duration.ofHours(1)),
         /** Exportación de datos del negocio, por empresa. */
         DATA_EXPORT(5, Duration.ofHours(1)),
         /** Reautenticación y cambios sensibles, por usuario. */

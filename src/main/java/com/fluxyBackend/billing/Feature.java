@@ -8,7 +8,7 @@ public enum Feature {
     CUSTOM_STYLE("Estilo de la tienda"),
     WHATSAPP("Pedidos por WhatsApp"),
     CUSTOM_DOMAIN("Dominio personalizado"),
-    AI_DESCRIPTIONS("Descripciones con IA"),
+    AI_DESCRIPTIONS("Textos con IA"),
     NO_BRANDING("Tienda sin la marca de Fluxy"),
     MARKETING_FULL_ANALYTICS("Analítica completa de campañas"),
     MARKETING_ADVANCED_SEGMENTS("Segmentos avanzados de clientes"),

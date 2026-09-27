@@ -1,157 +1,48 @@
 package com.fluxyBackend.controller;
 
+import com.fluxyBackend.ai.AiContentService;
+import com.fluxyBackend.security.access.AccessService;
 import com.fluxyBackend.security.access.Permission;
 import com.fluxyBackend.security.access.RequirePermission;
-
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
-
-import com.fluxyBackend.exception.NotFoundException;
-
-import com.fluxyBackend.entity.Company.Plan;
-import com.fluxyBackend.entity.User;
-import com.fluxyBackend.repository.UserRepository;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.util.Map;
-
-@Tag(name = "Inteligencia artificial", description = "Generación de contenido para productos.")
+/**
+ * Textos generados con IA (Google Gemini). Plan Business; lo generado es una propuesta que el
+ * vendedor revisa y edita antes de guardar.
+ */
+@Tag(name = "Inteligencia artificial", description = "Descripciones de productos y textos de campañas con IA.")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/ai")
 @RequiredArgsConstructor
 public class AIController {
 
-    private final UserRepository userRepository;
-
-    @Value("${gemini.api.key}")
-    private String geminiApiKey;
+    private final AiContentService ai;
+    private final AccessService access;
 
     @Operation(summary = "Generar una descripción de producto",
-            description = "Requiere plan BUSINESS y name. price y category son opcionales. Devuelve description; responde 403 sin el plan requerido y 502 si el proveedor rechaza la solicitud.",
+            description = "Requiere el plan Business (403 PLAN_REQUIRED) y name. price, category y notes (descripción actual a mejorar) son opcionales. "
+                    + "Máximo 60 por hora por empresa (429). 503 AI_UNAVAILABLE o 502 AI_FAILED si la IA no responde.",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     content = @Content(mediaType = "application/json",
                             examples = @ExampleObject(value = "{\"name\":\"Mochila urbana\",\"price\":\"89.90\",\"category\":\"Accesorios\"}"))))
     @PostMapping("/describe")
     @RequirePermission(value = {Permission.PRODUCT_CREATE, Permission.PRODUCT_UPDATE}, any = true)
-    public ResponseEntity<?> generateDescription(
-            Authentication authentication,
-            @RequestBody Map<String, String> body) {
-
-        User user = userRepository.findByEmailIgnoreCase(authentication.getName())
-                .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
-
-        if (!com.fluxyBackend.billing.PlanCatalog.has(user.getCompany(), com.fluxyBackend.billing.Feature.AI_DESCRIPTIONS)) {
-            return ResponseEntity.status(403).body(
-                    Map.of("message", "El generador de IA es exclusivo del plan Business.")
-            );
-        }
-
-        String name     = body.getOrDefault("name",     "").trim();
-        String price    = body.getOrDefault("price",    "").trim();
-        String category = body.getOrDefault("category", "").trim();
-
-        if (name.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "El nombre del producto es obligatorio."));
-        }
-
-        String prompt = "Eres un experto en copywriting para e-commerce latinoamericano. "
-                + "Genera una descripción atractiva y profesional para este producto: "
-                + "Nombre: " + name + ". "
-                + "Precio: S/ " + (price.isEmpty() ? "no especificado" : price) + ". "
-                + "Categoría: " + (category.isEmpty() ? "general" : category) + ". "
-                + "Requisitos: máximo 2 oraciones, tono cercano y persuasivo, "
-                + "resalta beneficios no características técnicas, sin emojis, en español. "
-                + "Responde SOLO con la descripción, sin comillas ni explicaciones.";
-
-        try {
-            String escapedPrompt = prompt
-                    .replace("\\", "\\\\")
-                    .replace("\"", "\\\"")
-                    .replace("\n", "\\n")
-                    .replace("\r", "\\r")
-                    .replace("\t", "\\t");
-
-            String requestBody = "{"
-                    + "\"contents\":[{\"parts\":[{\"text\":\"" + escapedPrompt + "\"}]}],"
-                    + "\"generationConfig\":{\"maxOutputTokens\":150,\"temperature\":0.7}"
-                    + "}";
-
-            String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + geminiApiKey;
-
-            HttpClient client = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(5)).build();
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(java.time.Duration.ofSeconds(20))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() != 200) {
-                System.err.println("Gemini API error " + response.statusCode() + ": " + response.body());
-                return ResponseEntity.status(502).body(Map.of("message", "Error al contactar la IA. Intenta de nuevo."));
-            }
-
-            String description = extractGeminiText(response.body());
-
-            if (description == null || description.isBlank()) {
-                return ResponseEntity.status(500).body(Map.of("message", "No se pudo extraer la descripción."));
-            }
-
-            return ResponseEntity.ok(Map.of("description", description));
-
-        } catch (Exception e) {
-            System.err.println("Error en AIController: " + e.getMessage());
-            // El detalle queda en el log; al cliente no se le exponen errores internos.
-            return ResponseEntity.status(502).body(Map.of("message", "No se pudo generar la descripción. Intentá de nuevo."));
-        }
+    public AiContentService.ProductDescription describe(@RequestBody AiContentService.ProductRequest request) {
+        return ai.describeProduct(access.current().company(), request);
     }
 
-    private String extractGeminiText(String json) {
-        try {
-            String textKey = "\"text\":\"";
-            int textIdx = json.indexOf(textKey);
-            if (textIdx == -1) return null;
-
-            int start = textIdx + textKey.length();
-            StringBuilder sb = new StringBuilder();
-            int i = start;
-            while (i < json.length()) {
-                char c = json.charAt(i);
-                if (c == '\\' && i + 1 < json.length()) {
-                    char next = json.charAt(i + 1);
-                    switch (next) {
-                        case '"'  -> sb.append('"');
-                        case '\\' -> sb.append('\\');
-                        case 'n'  -> sb.append(' ');
-                        case 'r'  -> {}
-                        case 't'  -> sb.append(' ');
-                        default   -> sb.append(next);
-                    }
-                    i += 2;
-                } else if (c == '"') {
-                    break;
-                } else {
-                    sb.append(c);
-                    i++;
-                }
-            }
-            return sb.toString().trim();
-        } catch (Exception e) {
-            return null;
-        }
+    @Operation(summary = "Generar el texto de una campaña",
+            description = "Título, mensaje y llamada a la acción para el asistente de Marketing. Mismo plan, tope y errores que /ai/describe.")
+    @PostMapping("/campaign-copy")
+    @RequirePermission(value = {Permission.MARKETING_CREATE, Permission.MARKETING_EDIT}, any = true)
+    public AiContentService.CampaignCopy campaignCopy(@RequestBody AiContentService.CampaignRequest request) {
+        return ai.campaignCopy(access.current().company(), request);
     }
 }
