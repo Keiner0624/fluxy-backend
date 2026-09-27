@@ -289,6 +289,10 @@ public class AdminController {
                 .setParameter("companyId", companyId).executeUpdate();
         entityManager.createQuery("DELETE FROM Coupon c WHERE c.company.id = :companyId")
                 .setParameter("companyId", companyId).executeUpdate();
+        entityManager.createQuery("DELETE FROM CampaignEvent e WHERE e.companyId = :companyId")
+                .setParameter("companyId", companyId).executeUpdate();
+        entityManager.createQuery("DELETE FROM MarketingCampaign c WHERE c.companyId = :companyId")
+                .setParameter("companyId", companyId).executeUpdate();
         entityManager.createQuery("DELETE FROM PushSubscription p WHERE p.user.id IN "
                         + "(SELECT u.id FROM User u WHERE u.company.id = :companyId)")
                 .setParameter("companyId", companyId).executeUpdate();

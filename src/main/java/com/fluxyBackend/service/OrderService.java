@@ -98,7 +98,13 @@ public class OrderService {
 
     @Transactional
     public Order createOrderAsClient(CreateOrderRequest request, Company company) {
-        return placeOrder(company, request, null, "Tienda en línea", "Pedido recibido desde la tienda");
+        Order order = placeOrder(company, request, null, "Tienda en línea", "Pedido recibido desde la tienda");
+        if (request.marketingSessionId != null && !request.marketingSessionId.isBlank()) {
+            // Se atribuye después de confirmar el pedido: si falla, el pedido no se entera.
+            eventPublisher.publishEvent(new com.fluxyBackend.marketing.service.CampaignOrderEvent(
+                    order.getId(), company.getId(), request.marketingSessionId));
+        }
+        return order;
     }
 
     private Order placeOrder(Company company, CreateOrderRequest request, User owner, String actor, String note) {

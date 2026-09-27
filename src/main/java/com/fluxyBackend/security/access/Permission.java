@@ -17,6 +17,8 @@ public enum Permission {
     REPORT_VIEW, REPORT_EXPORT,
     TEAM_VIEW, TEAM_INVITE, TEAM_MANAGE,
     INTEGRATION_VIEW, INTEGRATION_MANAGE,
+    /** Marketing: ver campañas, crearlas, editarlas, publicarlas (activar, pausar, finalizar) y ver resultados. */
+    MARKETING_VIEW, MARKETING_CREATE, MARKETING_EDIT, MARKETING_PUBLISH, MARKETING_ANALYTICS,
     /** Configuración, estilo y dominio de la tienda. */
     SETTINGS_MANAGE,
     /** Registro de actividad del negocio. */

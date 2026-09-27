@@ -9,7 +9,11 @@ public enum Feature {
     WHATSAPP("Pedidos por WhatsApp"),
     CUSTOM_DOMAIN("Dominio personalizado"),
     AI_DESCRIPTIONS("Descripciones con IA"),
-    NO_BRANDING("Tienda sin la marca de Fluxy");
+    NO_BRANDING("Tienda sin la marca de Fluxy"),
+    MARKETING_FULL_ANALYTICS("Analítica completa de campañas"),
+    MARKETING_ADVANCED_SEGMENTS("Segmentos avanzados de clientes"),
+    MARKETING_CUSTOM_QR("QR de campaña personalizado"),
+    MARKETING_EXPORT("Exportación de resultados de campañas");
 
     private final String label;
 

@@ -58,4 +58,13 @@ public final class AuditAction {
     public static final String PRODUCTS_BULK_CHANGED = "PRODUCTS_BULK_CHANGED";
     public static final String CATEGORY_DELETED = "CATEGORY_DELETED";
     public static final String COUPON_DELETED = "COUPON_DELETED";
+
+    // Marketing
+    public static final String CAMPAIGN_CREATED = "CAMPAIGN_CREATED";
+    public static final String CAMPAIGN_UPDATED = "CAMPAIGN_UPDATED";
+    public static final String CAMPAIGN_ACTIVATED = "CAMPAIGN_ACTIVATED";
+    public static final String CAMPAIGN_PAUSED = "CAMPAIGN_PAUSED";
+    public static final String CAMPAIGN_FINISHED = "CAMPAIGN_FINISHED";
+    public static final String CAMPAIGN_ARCHIVED = "CAMPAIGN_ARCHIVED";
+    public static final String CAMPAIGN_DELETED = "CAMPAIGN_DELETED";
 }

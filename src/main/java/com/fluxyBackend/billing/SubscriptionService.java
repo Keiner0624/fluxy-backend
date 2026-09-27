@@ -96,7 +96,7 @@ public class SubscriptionService {
     // ─── Vistas ──────────────────────────────────────────────────────────────
 
     public record PlanView(String code, String name, BigDecimal monthlyPrice, String currency, String interval,
-                           int productLimit, List<String> features, int version) {}
+                           int productLimit, int activeCampaignLimit, List<String> features, int version) {}
 
     public record PendingChange(String plan, String planName, OffsetDateTime effectiveAt, OffsetDateTime paidUntil) {}
 
@@ -131,7 +131,7 @@ public class SubscriptionService {
 
     public List<PlanView> plans() {
         return PlanCatalog.all().stream().map(p -> new PlanView(p.code().name(), p.name(), p.monthlyPrice(),
-                PlanCatalog.CURRENCY, PlanCatalog.INTERVAL, p.productLimit(),
+                PlanCatalog.CURRENCY, PlanCatalog.INTERVAL, p.productLimit(), p.activeCampaignLimit(),
                 p.features().stream().map(Enum::name).toList(), PlanCatalog.VERSION)).toList();
     }
 

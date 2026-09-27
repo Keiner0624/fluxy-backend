@@ -25,6 +25,8 @@ public class RateLimitService {
         STORE_READ(240, Duration.ofMinutes(1)),
         /** Pedidos desde la tienda pública, por IP. */
         STORE_ORDER(15, Duration.ofMinutes(10)),
+        /** Eventos de campañas desde la tienda pública, por IP: navegar un catálogo genera varios por minuto. */
+        STORE_TRACKING(120, Duration.ofMinutes(1)),
         /** Registro y acceso con Google/Apple, por IP. */
         SIGNUP(10, Duration.ofHours(1)),
         /** Renovación de sesión, por IP. */

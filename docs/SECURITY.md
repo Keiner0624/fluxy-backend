@@ -44,7 +44,7 @@ Si el correo ya tiene cuenta, se vincula y entra solo cuando el proveedor garant
 | Límite | Valor |
 |---|---|
 | API autenticada | 300 req/min por usuario |
-| Tienda pública | 240 lecturas/min y 15 pedidos/10 min por IP |
+| Tienda pública | 240 lecturas/min, 15 pedidos/10 min y 120 eventos de campaña/min por IP |
 | Registro y OAuth | 10/hora por IP |
 | Renovación de sesión | 60/min por IP |
 | Recuperación de contraseña | 10/hora por IP y 3/hora por correo (silencioso) |

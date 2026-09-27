@@ -34,4 +34,8 @@ public class CreateOrderRequest {
             message = "debe ser una clave de medio de pago, por ejemplo yape")
     @Schema(description = "Medio de pago elegido por el cliente; opcional.", example = "yape")
     public String paymentMethod;
+    @jakarta.validation.constraints.Pattern(regexp = "^[A-Za-z0-9_-]{16,64}$", message = "sesión inválida")
+    @Schema(description = "Id anónimo del navegador que llegó por un enlace de campaña; solo en la tienda pública. "
+            + "El servidor atribuye el pedido a la última campaña vigente que vio esa sesión.")
+    public String marketingSessionId;
 }

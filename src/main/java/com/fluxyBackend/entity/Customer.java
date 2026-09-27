@@ -56,6 +56,17 @@ public class Customer {
     @Column(length = 400)
     private String tags;
 
+    /**
+     * Pidió no recibir promociones: queda fuera de los segmentos de Marketing.
+     * Nullable para que la columna se agregue sin valor por defecto; null = sin baja.
+     */
+    @Column(name = "marketing_opt_out")
+    private Boolean marketingOptOut;
+
+    public boolean optedOutOfMarketing() {
+        return Boolean.TRUE.equals(marketingOptOut);
+    }
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

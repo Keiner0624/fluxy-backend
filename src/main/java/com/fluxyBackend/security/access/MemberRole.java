@@ -35,21 +35,24 @@ public enum MemberRole {
                     INVENTORY_VIEW, INVENTORY_ADJUST,
                     COUPON_VIEW, COUPON_MANAGE,
                     REPORT_VIEW, REPORT_EXPORT,
-                    TEAM_VIEW, INTEGRATION_VIEW);
+                    TEAM_VIEW, INTEGRATION_VIEW,
+                    MARKETING_VIEW, MARKETING_CREATE, MARKETING_EDIT, MARKETING_PUBLISH, MARKETING_ANALYTICS);
             case SELLER -> EnumSet.of(
                     PRODUCT_VIEW,
                     ORDER_VIEW, ORDER_UPDATE, ORDER_CANCEL,
                     CUSTOMER_VIEW, CUSTOMER_UPDATE,
                     PAYMENT_VIEW, PAYMENT_UPDATE,
                     INVENTORY_VIEW,
-                    COUPON_VIEW);
+                    COUPON_VIEW,
+                    MARKETING_VIEW);
             case WAREHOUSE -> EnumSet.of(
                     PRODUCT_VIEW,
                     ORDER_VIEW, ORDER_UPDATE,
                     INVENTORY_VIEW, INVENTORY_ADJUST);
             case VIEWER -> EnumSet.of(
                     PRODUCT_VIEW, ORDER_VIEW, CUSTOMER_VIEW, PAYMENT_VIEW,
-                    INVENTORY_VIEW, COUPON_VIEW, REPORT_VIEW);
+                    INVENTORY_VIEW, COUPON_VIEW, REPORT_VIEW,
+                    MARKETING_VIEW);
         };
     }
 

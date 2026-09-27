@@ -42,10 +42,11 @@ public class CustomerService {
     public record CustomerDetail(Long id, String name, String phone, String email, String address, String notes,
                                  List<String> tags, long ordersCount, long saleOrders, double totalSpent,
                                  double averageTicket, OffsetDateTime lastOrderAt, OffsetDateTime createdAt,
-                                 List<CustomerOrder> recentOrders) {}
+                                 List<CustomerOrder> recentOrders, boolean marketingOptOut) {}
 
+    /** marketingOptOut: true si pidió no recibir promociones; null lo deja como está. */
     public record CustomerRequest(String name, String phone, String email, String address, String notes,
-                                  List<String> tags) {}
+                                  List<String> tags, Boolean marketingOptOut) {}
 
     // ─── Pedidos → clientes ──────────────────────────────────────────────────
 
@@ -153,7 +154,7 @@ public class CustomerService {
                 customer.getAddress(), customer.getNotes(), splitTags(customer.getTags()), orders, saleOrders,
                 spent, saleOrders > 0 ? spent / saleOrders : 0,
                 stats == null ? null : BusinessClock.withOffset(stats.getLastOrderAt()),
-                BusinessClock.withOffset(customer.getCreatedAt()), recent);
+                BusinessClock.withOffset(customer.getCreatedAt()), recent, customer.optedOutOfMarketing());
     }
 
     // ─── Escritura ────────────────────────────────────────────────────────────
@@ -212,6 +213,7 @@ public class CustomerService {
             customer.setNotes(notes.isEmpty() ? null : notes);
         }
         if (request.tags() != null) customer.setTags(joinTags(request.tags()));
+        if (request.marketingOptOut() != null) customer.setMarketingOptOut(request.marketingOptOut());
     }
 
     // ─── Apoyo ────────────────────────────────────────────────────────────────

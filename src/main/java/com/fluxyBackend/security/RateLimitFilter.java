@@ -53,6 +53,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         String method = request.getMethod();
         if (path.startsWith("/store/")) {
+            if ("POST".equals(method) && path.endsWith("/events")) return RateLimitService.Bucket.STORE_TRACKING;
             return "POST".equals(method) ? RateLimitService.Bucket.STORE_ORDER : RateLimitService.Bucket.STORE_READ;
         }
         if (!"POST".equals(method)) return null;

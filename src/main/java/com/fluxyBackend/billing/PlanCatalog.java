@@ -19,25 +19,27 @@ public final class PlanCatalog {
     public static final String CURRENCY = "PEN";
     public static final String INTERVAL = "MONTHLY";
     public static final int VERSION = 1;
-    /** Sin límite de productos. */
+    /** Sin límite (productos o campañas). */
     public static final int UNLIMITED = -1;
 
+    /** activeCampaignLimit: campañas de marketing activas o programadas a la vez. */
     public record PlanInfo(Plan code, String name, BigDecimal monthlyPrice, int productLimit,
-                           Set<Feature> features, int rank) {
+                           int activeCampaignLimit, Set<Feature> features, int rank) {
         public boolean paid() {
             return monthlyPrice.signum() > 0;
         }
     }
 
     private static final Set<Feature> PRO_FEATURES = EnumSet.of(
-            Feature.METRICS, Feature.REPORTS, Feature.COUPONS, Feature.CUSTOM_STYLE, Feature.WHATSAPP);
+            Feature.METRICS, Feature.REPORTS, Feature.COUPONS, Feature.CUSTOM_STYLE, Feature.WHATSAPP,
+            Feature.MARKETING_FULL_ANALYTICS, Feature.MARKETING_ADVANCED_SEGMENTS, Feature.MARKETING_CUSTOM_QR);
     private static final Set<Feature> BUSINESS_FEATURES = union(PRO_FEATURES,
-            EnumSet.of(Feature.CUSTOM_DOMAIN, Feature.AI_DESCRIPTIONS, Feature.NO_BRANDING));
+            EnumSet.of(Feature.CUSTOM_DOMAIN, Feature.AI_DESCRIPTIONS, Feature.NO_BRANDING, Feature.MARKETING_EXPORT));
 
     private static final Map<Plan, PlanInfo> PLANS = Map.of(
-            Plan.FREE, new PlanInfo(Plan.FREE, "Free", BigDecimal.ZERO.setScale(2), 10, EnumSet.noneOf(Feature.class), 0),
-            Plan.PRO, new PlanInfo(Plan.PRO, "Pro", new BigDecimal("39.00"), 100, PRO_FEATURES, 1),
-            Plan.BUSINESS, new PlanInfo(Plan.BUSINESS, "Business", new BigDecimal("59.00"), UNLIMITED, BUSINESS_FEATURES, 2));
+            Plan.FREE, new PlanInfo(Plan.FREE, "Free", BigDecimal.ZERO.setScale(2), 10, 2, EnumSet.noneOf(Feature.class), 0),
+            Plan.PRO, new PlanInfo(Plan.PRO, "Pro", new BigDecimal("39.00"), 100, 20, PRO_FEATURES, 1),
+            Plan.BUSINESS, new PlanInfo(Plan.BUSINESS, "Business", new BigDecimal("59.00"), UNLIMITED, UNLIMITED, BUSINESS_FEATURES, 2));
 
     private PlanCatalog() {
     }

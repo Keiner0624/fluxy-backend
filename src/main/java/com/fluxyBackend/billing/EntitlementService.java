@@ -34,6 +34,11 @@ public class EntitlementService {
                         "currentPlan", effectivePlan(company).name()));
     }
 
+    /** Campañas de marketing activas o programadas a la vez; PlanCatalog.UNLIMITED si no hay tope. */
+    public int activeCampaignLimit(Company company) {
+        return PlanCatalog.info(effectivePlan(company)).activeCampaignLimit();
+    }
+
     /** Máximo de productos; PlanCatalog.UNLIMITED si no hay tope. */
     public int productLimit(Company company) {
         return PlanCatalog.info(effectivePlan(company)).productLimit();
