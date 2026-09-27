@@ -281,6 +281,8 @@ public class AdminController {
 
         orderRepository.deleteOrderItemsByCompanyId(companyId);
         orderRepository.deleteOrdersByCompanyId(companyId);
+        entityManager.createQuery("DELETE FROM CustomerActivity a WHERE a.companyId = :companyId")
+                .setParameter("companyId", companyId).executeUpdate();
         customerRepository.deleteByCompanyId(companyId);
         productRepository.deleteByCompanyId(companyId);
         // Categorías, cupones y suscripciones push referencian a la empresa o a

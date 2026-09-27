@@ -44,6 +44,7 @@ public class OrderService {
     private final CouponRepository couponRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final CustomerService customerService;
+    private final com.fluxyBackend.customer.activity.CustomerActivityService customerActivity;
     private final InventoryService inventoryService;
     private final IntegrationService integrationService;
     private final OrderStatusChangeRepository statusChangeRepository;
@@ -160,7 +161,8 @@ public class OrderService {
         // Boleta o factura pedida al comprar: se valida ahora (RUC, DNI) y se guarda para emitirla después.
         invoiceRequests.apply(order, request, lockedCompany);
         order.setCustomer(customerService.resolveForOrder(lockedCompany.getId(), request.customerName,
-                request.customerPhone, request.customerAddress));
+                request.customerPhone, request.customerAddress,
+                owner == null ? com.fluxyBackend.customer.CustomerSource.ONLINE_STORE : com.fluxyBackend.customer.CustomerSource.POS));
 
         Order savedOrder = orderRepository.save(order);
         String reference = "Pedido #" + savedOrder.getId();
@@ -171,6 +173,16 @@ public class OrderService {
         }
         statusChangeRepository.save(new OrderStatusChange(savedOrder.getId(), lockedCompany.getId(),
                 null, OrderStatus.PENDING, note, actor));
+        String activityActor = owner == null ? null : actor;
+        customerActivity.record(lockedCompany.getId(), savedOrder.getCustomerId(),
+                com.fluxyBackend.customer.activity.CustomerActivityType.ORDER_CREATED, savedOrder.getId(),
+                reference + (owner == null ? " desde la tienda" : " desde el panel"), savedOrder.getTotal(), activityActor);
+        if (savedOrder.getCouponCode() != null) {
+            customerActivity.record(lockedCompany.getId(), savedOrder.getCustomerId(),
+                    com.fluxyBackend.customer.activity.CustomerActivityType.COUPON_USED, savedOrder.getId(),
+                    "Cupón " + savedOrder.getCouponCode() + " en el " + reference.toLowerCase(java.util.Locale.ROOT),
+                    savedOrder.getDiscountAmount(), activityActor);
+        }
 
         if (savedOrder.getTotal() != null && savedOrder.getTotal() > 0) {
             OrderPayment payment = new OrderPayment();

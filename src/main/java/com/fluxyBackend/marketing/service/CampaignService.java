@@ -67,6 +67,7 @@ public class CampaignService {
     private final AuditService audit;
     private final CampaignAnalyticsService analytics;
     private final CampaignLinkBuilder links;
+    private final SegmentService segmentService;
     private final BusinessClock clock;
 
     // ─── Lectura ─────────────────────────────────────────────────────────────
@@ -376,6 +377,7 @@ public class CampaignService {
         } else {
             campaign.setSegmentCategoryId(null);
         }
+        campaign.setSegmentValue(segment == null ? null : segmentService.validateValue(company, segment, request.segmentValue()));
 
         LocalDateTime startsAt = serverTime(request.startsAt());
         LocalDateTime endsAt = serverTime(request.endsAt());
@@ -465,7 +467,7 @@ public class CampaignService {
                 lookups.targetName(c), lookups.targetImage(c), c.getCouponId(), coupon == null ? null : coupon.getCode(),
                 c.getChannel().name(), c.getStatus().name(), c.getTrackingCode(), c.getTitle(), c.getMessage(),
                 c.getCallToAction(), c.getImageUrl(), c.getSegment() == null ? null : c.getSegment().name(),
-                c.getSegmentCategoryId(), BusinessClock.withOffset(c.getStartsAt()), BusinessClock.withOffset(c.getEndsAt()),
+                c.getSegmentCategoryId(), c.getSegmentValue(), BusinessClock.withOffset(c.getStartsAt()), BusinessClock.withOffset(c.getEndsAt()),
                 BusinessClock.withOffset(c.getActivatedAt()), BusinessClock.withOffset(c.getFinishedAt()),
                 BusinessClock.withOffset(c.getCreatedAt()), BusinessClock.withOffset(c.getUpdatedAt()),
                 c.acceptsAttribution(LocalDateTime.now()), actions, metrics);

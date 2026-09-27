@@ -158,11 +158,13 @@ public class MarketingController {
     }
 
     @Operation(summary = "Clientes de un segmento",
-            description = "Hasta 500, para contactarlos uno a uno. Requiere además CUSTOMER_VIEW. categoryId en CATEGORY_BUYERS.")
+            description = "Hasta 500, para contactarlos uno a uno. Requiere además CUSTOMER_VIEW. categoryId en "
+                    + "CATEGORY_BUYERS; value es la etiqueta (TAG), el origen (SOURCE) o el id de producto (PRODUCT_BUYERS).")
     @GetMapping("/segments/{key}/customers")
     @RequirePermission({Permission.MARKETING_VIEW, Permission.CUSTOMER_VIEW})
     public List<SegmentView.Customer> segmentCustomers(@PathVariable String key,
-                                                       @RequestParam(required = false) Long categoryId) {
-        return segments.customers(access.current().company(), SegmentService.parse(key), categoryId);
+                                                       @RequestParam(required = false) Long categoryId,
+                                                       @RequestParam(required = false) String value) {
+        return segments.customers(access.current().company(), SegmentService.parse(key), categoryId, value);
     }
 }

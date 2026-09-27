@@ -23,8 +23,10 @@ public record CampaignRequest(
         @Size(max = 1000) String message,
         @Size(max = 60) String callToAction,
         @Size(max = 2048) @Pattern(regexp = "^$|^https://\\S+$", message = "debe ser una URL https") String imageUrl,
-        @Schema(description = "ALL, NEW, INACTIVE_30, FREQUENT, HIGH_VALUE o CATEGORY_BUYERS") String segment,
+        @Schema(description = "ALL, NEW, RECURRING, INACTIVE_30, FREQUENT, HIGH_VALUE, TAG, SOURCE, CATEGORY_BUYERS o PRODUCT_BUYERS")
+        String segment,
         Long segmentCategoryId,
+        @Schema(description = "Etiqueta (TAG), origen (SOURCE) o id de producto (PRODUCT_BUYERS)") @Size(max = 100) String segmentValue,
         OffsetDateTime startsAt,
         OffsetDateTime endsAt) {
 }

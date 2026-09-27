@@ -26,6 +26,7 @@ public record CampaignView(
         String imageUrl,
         String segment,
         Long segmentCategoryId,
+        String segmentValue,
         OffsetDateTime startsAt,
         OffsetDateTime endsAt,
         OffsetDateTime activatedAt,

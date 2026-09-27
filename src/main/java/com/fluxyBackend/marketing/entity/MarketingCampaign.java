@@ -86,6 +86,10 @@ public class MarketingCampaign {
     @Column(name = "segment_category_id")
     private Long segmentCategoryId;
 
+    /** Etiqueta, origen o id de producto de los segmentos TAG, SOURCE y PRODUCT_BUYERS. */
+    @Column(name = "segment_value", length = 100)
+    private String segmentValue;
+
     @Column(name = "starts_at")
     private LocalDateTime startsAt;
 

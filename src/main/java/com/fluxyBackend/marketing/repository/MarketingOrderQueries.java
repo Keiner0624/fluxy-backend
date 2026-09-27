@@ -15,16 +15,6 @@ import java.util.List;
  */
 public interface MarketingOrderQueries extends Repository<Order, Long> {
 
-    /** Historial de compra por cliente, sin pedidos cancelados. */
-    @Query("""
-            SELECT o.customer.id AS customerId, COUNT(o) AS orders, SUM(o.total) AS spent,
-                   MIN(o.createdAt) AS firstOrderAt, MAX(o.createdAt) AS lastOrderAt
-            FROM Order o
-            WHERE o.company.id = :companyId AND o.customer IS NOT NULL AND o.status <> :cancelled
-            GROUP BY o.customer.id
-            """)
-    List<BuyerStats> buyerStats(@Param("companyId") Long companyId, @Param("cancelled") OrderStatus cancelled);
-
     @Query("""
             SELECT DISTINCT i.order.customer.id FROM OrderItem i
             WHERE i.order.company.id = :companyId AND i.prodcut.category.id = :categoryId
@@ -32,6 +22,14 @@ public interface MarketingOrderQueries extends Repository<Order, Long> {
             """)
     List<Long> categoryBuyers(@Param("companyId") Long companyId, @Param("categoryId") Long categoryId,
                               @Param("cancelled") OrderStatus cancelled);
+
+    @Query("""
+            SELECT DISTINCT i.order.customer.id FROM OrderItem i
+            WHERE i.order.company.id = :companyId AND i.prodcut.id = :productId
+              AND i.order.customer IS NOT NULL AND i.order.status <> :cancelled
+            """)
+    List<Long> productBuyers(@Param("companyId") Long companyId, @Param("productId") Long productId,
+                             @Param("cancelled") OrderStatus cancelled);
 
     /** Unidades vendidas por producto desde una fecha. */
     @Query("""
@@ -72,14 +70,6 @@ public interface MarketingOrderQueries extends Repository<Order, Long> {
     CouponUse couponUse(@Param("companyId") Long companyId, @Param("code") String code,
                         @Param("from") LocalDateTime from, @Param("to") LocalDateTime to,
                         @Param("cancelled") OrderStatus cancelled);
-
-    interface BuyerStats {
-        Long getCustomerId();
-        long getOrders();
-        Double getSpent();
-        LocalDateTime getFirstOrderAt();
-        LocalDateTime getLastOrderAt();
-    }
 
     interface ProductUnits {
         Long getProductId();

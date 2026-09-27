@@ -41,6 +41,7 @@ public class OrderPaymentService {
     private final OrderRepository orderRepository;
     private final BusinessClock clock;
     private final org.springframework.context.ApplicationEventPublisher events;
+    private final com.fluxyBackend.customer.activity.CustomerActivityService customerActivity;
 
     public record PaymentView(Long id, Long orderId, String status, String provider, String method, double amount,
                               double refundedAmount, double netAmount, String currency, String providerReference,
@@ -255,6 +256,11 @@ public class OrderPaymentService {
         String entry = "Reembolso S/ %.2f: %s (%s)".formatted(amount, reason, member.displayName());
         payment.setNote(trim(payment.getNote() == null ? entry : payment.getNote() + " · " + entry, 300));
         Order order = orderRepository.findByIdAndCompanyId(payment.getOrderId(), member.companyId()).orElse(null);
+        if (order != null) {
+            customerActivity.record(member.companyId(), order.getCustomerId(),
+                    com.fluxyBackend.customer.activity.CustomerActivityType.REFUND_CREATED, order.getId(),
+                    "Reembolso del pedido #" + order.getId() + ": " + reason, round(amount), member.displayName());
+        }
         return view(paymentRepository.save(payment), order);
     }
 

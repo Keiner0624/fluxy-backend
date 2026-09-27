@@ -1,5 +1,6 @@
 package com.fluxyBackend.entity;
 
+import com.fluxyBackend.customer.CustomerSource;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -15,7 +16,11 @@ import java.time.LocalDateTime;
 @Table(name = "customers",
         uniqueConstraints = @UniqueConstraint(name = "uk_customers_company_phone",
                 columnNames = {"company_id", "phone_key"}),
-        indexes = @Index(name = "idx_customers_company_name", columnList = "company_id, name_key"))
+        indexes = {
+                @Index(name = "idx_customers_company_name", columnList = "company_id, name_key"),
+                @Index(name = "idx_customers_company_source", columnList = "company_id, source"),
+                @Index(name = "idx_customers_company_opt_out", columnList = "company_id, marketing_opt_out")
+        })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -62,6 +67,15 @@ public class Customer {
      */
     @Column(name = "marketing_opt_out")
     private Boolean marketingOptOut;
+
+    /** Por dónde llegó; lo completa CustomerDataBackfill para los clientes anteriores al CRM. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private CustomerSource source;
+
+    /** Campaña que trajo su primera compra (solo si source = CAMPAIGN). */
+    @Column(name = "source_campaign_id")
+    private Long sourceCampaignId;
 
     public boolean optedOutOfMarketing() {
         return Boolean.TRUE.equals(marketingOptOut);

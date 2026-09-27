@@ -52,6 +52,8 @@ public class CampaignTrackingService {
     private final ProductRepository products;
     private final CouponRepository coupons;
     private final OrderRepository orders;
+    private final com.fluxyBackend.repository.CustomerRepository customers;
+    private final com.fluxyBackend.customer.activity.CustomerActivityService customerActivity;
 
     public TrackEventResponse track(Company company, TrackEventRequest request) {
         CampaignEventType type = parseType(request.type());
@@ -134,9 +136,34 @@ public class CampaignTrackingService {
             event.setAmount(order.getTotal());
             event.setDedupeKey("O|" + order.getId());
             event.setOccurredAt(now);
-            return save(event);
+            boolean saved = save(event);
+            if (saved) recordCustomer(order, campaign);
+            return saved;
         }
         return false;
+    }
+
+    /**
+     * Línea de tiempo del cliente y, si es su primera compra, la campaña queda como su origen.
+     * Se hace en la misma transacción que la atribución.
+     */
+    private void recordCustomer(Order order, MarketingCampaign campaign) {
+        Long customerId = order.getCustomerId();
+        if (customerId == null) return;
+        Long companyId = campaign.getCompanyId();
+        customerActivity.record(companyId, customerId,
+                com.fluxyBackend.customer.activity.CustomerActivityType.CAMPAIGN_INTERACTION, order.getId(),
+                "Compró desde la campaña " + campaign.getName() + " (pedido #" + order.getId() + ")", order.getTotal(), null);
+        customers.findByIdAndCompanyId(customerId, companyId)
+                .filter(c -> c.getSourceCampaignId() == null
+                        && (c.getSource() == null || c.getSource() == com.fluxyBackend.customer.CustomerSource.ONLINE_STORE))
+                .filter(c -> orders.findByCompanyIdAndCustomer_Id(companyId, customerId,
+                        org.springframework.data.domain.PageRequest.of(0, 1)).getTotalElements() == 1)
+                .ifPresent(c -> {
+                    c.setSource(com.fluxyBackend.customer.CustomerSource.CAMPAIGN);
+                    c.setSourceCampaignId(campaign.getId());
+                    customers.save(c);
+                });
     }
 
     private boolean save(CampaignEvent event) {

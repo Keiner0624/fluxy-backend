@@ -30,7 +30,7 @@ public enum MemberRole {
             case MANAGER -> EnumSet.of(
                     PRODUCT_VIEW, PRODUCT_CREATE, PRODUCT_UPDATE, PRODUCT_DELETE,
                     ORDER_VIEW, ORDER_UPDATE, ORDER_CANCEL,
-                    CUSTOMER_VIEW, CUSTOMER_UPDATE,
+                    CUSTOMER_VIEW, CUSTOMER_UPDATE, CUSTOMER_CREATE, CUSTOMER_NOTES, CUSTOMER_TAGS,
                     PAYMENT_VIEW, PAYMENT_UPDATE, PAYMENT_REFUND,
                     INVENTORY_VIEW, INVENTORY_ADJUST,
                     COUPON_VIEW, COUPON_MANAGE,
@@ -41,7 +41,7 @@ public enum MemberRole {
             case SELLER -> EnumSet.of(
                     PRODUCT_VIEW,
                     ORDER_VIEW, ORDER_UPDATE, ORDER_CANCEL,
-                    CUSTOMER_VIEW, CUSTOMER_UPDATE,
+                    CUSTOMER_VIEW, CUSTOMER_UPDATE, CUSTOMER_CREATE, CUSTOMER_NOTES, CUSTOMER_TAGS,
                     PAYMENT_VIEW, PAYMENT_UPDATE,
                     INVENTORY_VIEW,
                     COUPON_VIEW,
