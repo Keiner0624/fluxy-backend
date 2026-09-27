@@ -34,6 +34,9 @@ public class Company {
     private String address;
     @Column(length = 2000)
     private String description;
+    /** Texto de la sección Nosotros de la tienda; la descripción queda para la portada. */
+    @Column(length = 2000)
+    private String aboutText;
     private String primaryColor;
     @Column(length = 2048)
     private String logoUrl;
@@ -119,6 +122,8 @@ public class Company {
     public void setAddress(String address) { this.address = address; }
 
     public String getDescription() { return description; }
+    public String getAboutText() { return aboutText; }
+    public void setAboutText(String aboutText) { this.aboutText = aboutText; }
     public void setDescription(String description) { this.description = description; }
 
     public String getPrimaryColor() { return primaryColor; }

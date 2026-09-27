@@ -10,6 +10,8 @@ public record PublicStoreResponse(
         String phone,
         String address,
         String description,
+        /* Sección Nosotros; null si el negocio no la escribió. */
+        String aboutText,
         String primaryColor,
         String logoUrl,
         String storeStyle,
@@ -34,6 +36,7 @@ public record PublicStoreResponse(
                 company.getPhone(),
                 company.getAddress(),
                 company.getDescription(),
+                company.getAboutText(),
                 company.getPrimaryColor(),
                 company.getLogoUrl(),
                 // Sin el plan, la tienda se ve con el estilo por defecto; el del vendedor queda guardado.

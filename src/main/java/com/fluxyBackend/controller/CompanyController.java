@@ -60,7 +60,7 @@ public class CompanyController {
 
     // ─── Actualizar configuración ────────────────────────────────────────────
     @Operation(summary = "Actualizar la configuración de mi tienda",
-            description = "Permite actualizar name, description, phone, address, email, logoUrl, storeStyle, primaryColor y paymentMethods.")
+            description = "Permite actualizar name, description (portada), aboutText (sección Nosotros), phone, address, email, logoUrl, storeStyle, primaryColor y paymentMethods.")
     @PutMapping("/config")
     @RequirePermission(Permission.SETTINGS_MANAGE)
     public Company updateConfig(@jakarta.validation.Valid @RequestBody CompanyConfigRequest config) {
@@ -73,6 +73,8 @@ public class CompanyController {
             company.setName(config.name().strip());
         if (config.description() != null)
             company.setDescription(config.description());
+        if (config.aboutText() != null)
+            company.setAboutText(config.aboutText().isBlank() ? null : config.aboutText().strip());
         if (config.phone() != null)
             company.setPhone(config.phone().strip());
         if (config.address() != null)
@@ -99,6 +101,7 @@ public class CompanyController {
     public record CompanyConfigRequest(
             @jakarta.validation.constraints.Size(max = 120) String name,
             @jakarta.validation.constraints.Size(max = 2000) String description,
+            @jakarta.validation.constraints.Size(max = 2000) String aboutText,
             @jakarta.validation.constraints.Size(max = 30) String phone,
             @jakarta.validation.constraints.Size(max = 300) String address,
             @jakarta.validation.constraints.Size(max = 254) @jakarta.validation.constraints.Email String email,

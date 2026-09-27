@@ -37,6 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class CompanySettingsIntegrationTest {
 
+    private static final String ABOUT = "Abrimos en 2019.\nTostamos nuestro propio café.";
+
     @Autowired private MockMvc mvc;
     @Autowired private JsonMapper json;
     @Autowired private SessionService sessions;
@@ -71,6 +73,7 @@ class CompanySettingsIntegrationTest {
         mvc.perform(put("/companies/config").header("Authorization", TestAuth.bearer(sessions, owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of("name", "Cafetería", "description", description,
+                                "aboutText", ABOUT,
                                 "address", address, "logoUrl", logo, "paymentMethods", "[\"yape\"]"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.description").value(description));
@@ -79,6 +82,11 @@ class CompanySettingsIntegrationTest {
         assertThat(saved.getDescription()).hasSize(1500);
         assertThat(saved.getAddress()).isEqualTo(address);
         assertThat(saved.getLogoUrl()).isEqualTo(logo);
+        // Nosotros se guarda aparte de la descripción de la portada y la tienda pública lo recibe.
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/store/slug/" + saved.getSlug() + "/info"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value(description))
+                .andExpect(jsonPath("$.aboutText").value(ABOUT));
 
         Prodcut product = products.save(Prodcut.builder().name("Latte").price(10).stock(5).owner(owner).company(saved).build());
         String deliveryAddress = "Jr. Muy Largo ".repeat(21) + "9";
