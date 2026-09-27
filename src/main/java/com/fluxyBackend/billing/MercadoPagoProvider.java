@@ -136,6 +136,7 @@ public class MercadoPagoProvider implements PaymentProvider {
     @Override
     public boolean verifyWebhook(String signature, String requestId, String dataId) {
         if (webhookSecret == null || webhookSecret.isBlank()) {
+            log.error("MERCADOPAGO_WEBHOOK_SECRET no está configurado: los avisos de pago se rechazan");
             throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, "WEBHOOK_NOT_CONFIGURED",
                     "MERCADOPAGO_WEBHOOK_SECRET no está configurado.");
         }

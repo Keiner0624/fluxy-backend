@@ -92,6 +92,55 @@ class SubscriptionIntegrationTest {
     }
 
     @Test
+    void alVolverDeMercadoPagoElPlanSeActivaSinEsperarElWebhook() throws Exception {
+        Tenant t = tenant();
+        String id = String.valueOf(System.nanoTime() % 1_000_000_000L);
+        when(paymentProvider.fetchPayment(id)).thenReturn(approved(id, t, "BUSINESS", 1));
+
+        mvc.perform(post("/billing/subscription/confirm").header("Authorization", t.token())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"paymentId\":\"" + id + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPLIED"))
+                .andExpect(jsonPath("$.subscription.plan").value("BUSINESS"));
+        assertThat(plan(t)).isEqualTo(Plan.BUSINESS);
+
+        // El webhook (o una segunda vuelta) llega después y no suma nada.
+        mvc.perform(post("/billing/subscription/confirm").header("Authorization", t.token())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"paymentId\":\"" + id + "\"}"))
+                .andExpect(jsonPath("$.status").value("ALREADY_APPLIED"));
+        when(paymentProvider.verifyWebhook(any(), any(), any())).thenReturn(true);
+        mvc.perform(post("/payments/webhook").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"payment\",\"data\":{\"id\":\"" + id + "\"}}"))
+                .andExpect(status().isOk());
+        assertThat(billingPayments.findByCompanyIdOrderByPaidAtDescIdDesc(t.company().getId(),
+                org.springframework.data.domain.PageRequest.of(0, 10))).hasSize(1);
+    }
+
+    @Test
+    void laVueltaSoloConfirmaPagosPropiosYRespetaElEstado() throws Exception {
+        Tenant t = tenant();
+        Tenant other = tenant();
+        String foreign = "71" + (System.nanoTime() % 1_000_000L);
+        when(paymentProvider.fetchPayment(foreign)).thenReturn(approved(foreign, other, "PRO", 1));
+        mvc.perform(post("/billing/subscription/confirm").header("Authorization", t.token())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"paymentId\":\"" + foreign + "\"}"))
+                .andExpect(status().isNotFound());
+        assertThat(plan(other)).isEqualTo(Plan.FREE);
+
+        String pending = "72" + (System.nanoTime() % 1_000_000L);
+        when(paymentProvider.fetchPayment(pending)).thenReturn(
+                new ProviderPayment(pending, "in_process", t.company().getId() + "|PRO|1", new BigDecimal("39.00"), "PEN"));
+        mvc.perform(post("/billing/subscription/confirm").header("Authorization", t.token())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"paymentId\":\"" + pending + "\"}"))
+                .andExpect(jsonPath("$.status").value("PENDING"));
+        assertThat(plan(t)).isEqualTo(Plan.FREE);
+
+        mvc.perform(post("/billing/subscription/confirm").header("Authorization", t.token())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"paymentId\":\"abc\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void unPagoRepetidoNoSumaMesesDosVeces() {
         Tenant t = tenant();
         String id = "pay-" + uid();

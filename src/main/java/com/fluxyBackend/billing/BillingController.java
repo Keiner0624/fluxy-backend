@@ -29,10 +29,13 @@ public class BillingController {
 
     private final SubscriptionService subscriptionService;
     private final AccessService accessService;
+    private final PaymentConfirmationService confirmations;
 
     public record CheckoutRequest(String plan, Integer months) {}
 
     public record CancelRequest(String reason, String comment) {}
+
+    public record ReturnRequest(String paymentId) {}
 
     @Operation(summary = "Planes disponibles", description = "Precio mensual en PEN, límite de productos (-1 = sin límite) y funciones.")
     @GetMapping("/plans")
@@ -71,6 +74,17 @@ public class BillingController {
     public SubscriptionService.CheckoutResponse checkout(@RequestBody CheckoutRequest request) {
         int months = request.months() == null ? 1 : request.months();
         return subscriptionService.checkout(accessService.current(), request.plan(), months);
+    }
+
+    @Operation(summary = "Confirmar un pago al volver de Mercado Pago",
+            description = "paymentId es el payment_id que Mercado Pago agrega a la URL de vuelta. El pago se consulta en "
+                    + "Mercado Pago (no se confía en la URL) y, si está aprobado y es de esta empresa, se aplica igual que con "
+                    + "el webhook; lo que llegue primero lo aplica y el otro no suma nada. status: APPLIED, ALREADY_APPLIED, "
+                    + "PENDING o REJECTED. 404 si el pago es de otra empresa.")
+    @PostMapping("/subscription/confirm")
+    @RequirePermission(Permission.BILLING_MANAGE)
+    public PaymentConfirmationService.ReturnResult confirm(@RequestBody ReturnRequest request) {
+        return confirmations.confirmReturn(accessService.current(), request.paymentId());
     }
 
     @Operation(summary = "Cancelar la suscripción",

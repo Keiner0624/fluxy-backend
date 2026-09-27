@@ -1,16 +1,11 @@
 package com.fluxyBackend.controller;
 
-import com.fluxyBackend.billing.BillingPayment;
 import com.fluxyBackend.billing.PaymentProvider;
-import com.fluxyBackend.billing.PlanCatalog;
 import com.fluxyBackend.billing.SubscriptionService;
-import com.fluxyBackend.billing.SubscriptionService.ActivationResult;
 import com.fluxyBackend.exception.BusinessException;
 import com.fluxyBackend.security.access.AccessService;
 import com.fluxyBackend.security.access.Permission;
 import com.fluxyBackend.security.access.RequirePermission;
-import com.fluxyBackend.service.BusinessClock;
-import com.fluxyBackend.service.EmailService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -28,10 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.format.DateTimeFormatter;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Checkout y webhook de Mercado Pago. La lógica de planes vive en SubscriptionService;
@@ -44,12 +36,11 @@ import java.util.Optional;
 @Slf4j
 public class MercadoPagoController {
 
-    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d 'de' MMMM", Locale.forLanguageTag("es-PE"));
 
     private final SubscriptionService subscriptionService;
     private final PaymentProvider paymentProvider;
     private final AccessService accessService;
-    private final EmailService emailService;
+    private final com.fluxyBackend.billing.PaymentConfirmationService confirmations;
 
     @Operation(summary = "Crear una preferencia de pago (compatibilidad)",
             description = "Equivale a POST /billing/subscription/checkout. body: plan (PRO o BUSINESS) y months (1 a 12, como texto). "
@@ -94,13 +85,15 @@ public class MercadoPagoController {
 
         try {
             if (!paymentProvider.verifyWebhook(signature, requestId, paymentId)) {
-                log.warn("Webhook de Mercado Pago con firma inválida");
+                log.warn("Webhook de Mercado Pago con firma inválida para el pago {}: revisá que MERCADOPAGO_WEBHOOK_SECRET "
+                        + "sea la clave de la misma aplicación que el MERCADOPAGO_ACCESS_TOKEN", paymentId);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
-            Optional<ActivationResult> result = subscriptionService.applyPayment(paymentProvider.fetchPayment(paymentId));
-            result.ifPresent(this::sendConfirmation);
+            confirmations.confirm(paymentId);
             return ResponseEntity.ok().build();
         } catch (BusinessException e) {
+            // Mercado Pago reintenta: el motivo queda en el log (p. ej. falta MERCADOPAGO_WEBHOOK_SECRET).
+            log.warn("Webhook de Mercado Pago rechazado para el pago {}: {} ({})", paymentId, e.getCode(), e.getMessage());
             return ResponseEntity.status(e.getStatus()).build();
         } catch (Exception e) {
             log.error("Error procesando webhook de Mercado Pago para pago {}", paymentId, e);
@@ -108,19 +101,6 @@ public class MercadoPagoController {
         }
     }
 
-    private void sendConfirmation(ActivationResult result) {
-        if (result.ownerEmail() == null) return;
-        if (result.kind() == BillingPayment.Kind.DOWNGRADE) {
-            String planName = PlanCatalog.info(result.plan()).name();
-            emailService.sendBillingNotice(result.ownerEmail(), result.ownerName(), "Programaste el cambio a " + planName,
-                    "Recibimos tu pago. Seguís con tu plan actual hasta el " + BusinessClock.withOffset(result.effectiveAt()).format(DAY)
-                            + " y ese día empieza " + planName + ", pagado hasta el "
-                            + BusinessClock.withOffset(result.paidUntil()).format(DAY) + ".");
-        } else {
-            emailService.sendPlanActivatedEmail(result.ownerEmail(), result.ownerName(), result.plan().name(), result.paidUntil());
-        }
-        log.info("Pago aplicado: plan {} ({}) para company {}", result.plan(), result.kind(), result.companyId());
-    }
 
     private String nestedDataId(Map<String, Object> body) {
         if (body == null) return null;
