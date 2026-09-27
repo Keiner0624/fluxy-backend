@@ -42,6 +42,14 @@ public class MercadoPagoProvider implements PaymentProvider {
 
     @PostConstruct
     void configureSdk() {
+        // Avisos al arrancar: sin esto, el problema recién aparece cuando alguien intenta pagar.
+        if (accessToken == null || accessToken.isBlank()) {
+            log.error("MERCADOPAGO_ACCESS_TOKEN no está configurado: no se van a poder cobrar planes");
+        }
+        if (!isPublicUrl(backendUrl)) {
+            log.error("APP_BACKEND_URL ({}) no es una URL pública https: Mercado Pago no puede avisar los pagos "
+                    + "y no se van a poder cobrar planes", backendUrl);
+        }
         MercadoPagoConfig.setAccessToken(accessToken);
         // Sin límites explícitos, un Mercado Pago lento dejaba colgado el hilo de la petición.
         MercadoPagoConfig.setConnectionTimeout(5_000);
@@ -57,6 +65,13 @@ public class MercadoPagoProvider implements PaymentProvider {
 
     @Override
     public CheckoutResult createCheckout(CheckoutCommand command) {
+        // El plan se activa solo con el aviso (webhook) de Mercado Pago: sin una URL pública a la
+        // que avisar, se cobraría sin activar nada. Mejor no iniciar el pago.
+        if (accessToken == null || accessToken.isBlank() || !isPublicUrl(backendUrl)) {
+            log.error("Pago no iniciado: falta MERCADOPAGO_ACCESS_TOKEN o APP_BACKEND_URL no es pública ({})", backendUrl);
+            throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, "PAYMENTS_NOT_CONFIGURED",
+                    "Los pagos no están disponibles en este momento. Escribinos a soporte y lo resolvemos.");
+        }
         PreferenceItemRequest item = PreferenceItemRequest.builder()
                 .title(command.title())
                 .quantity(1)
@@ -73,15 +88,36 @@ public class MercadoPagoProvider implements PaymentProvider {
                 .backUrls(backUrls)
                 .autoReturn("approved")
                 .externalReference(command.externalReference())
-                .notificationUrl(backendUrl + "/payments/webhook")
+                .notificationUrl(backendUrl.replaceAll("/+$", "") + "/payments/webhook")
                 .build();
         try {
             Preference preference = new PreferenceClient().create(request);
             return new CheckoutResult(preference.getId(), preference.getInitPoint(), preference.getSandboxInitPoint());
-        } catch (MPException | MPApiException e) {
-            log.error("Error creando preferencia de Mercado Pago", e);
+        } catch (MPApiException e) {
+            // La respuesta de Mercado Pago dice el motivo (token inválido, moneda, URL); no trae datos sensibles.
+            log.error("Mercado Pago rechazó la preferencia ({}): {}", e.getStatusCode(),
+                    e.getApiResponse() == null ? e.getMessage() : e.getApiResponse().getContent());
+            throw new BusinessException(HttpStatus.BAD_GATEWAY, "PAYMENT_PROVIDER_ERROR",
+                    e.getStatusCode() == 401 || e.getStatusCode() == 403
+                            ? "Los pagos no están disponibles en este momento. Escribinos a soporte y lo resolvemos."
+                            : "No se pudo iniciar el pago. Intentá de nuevo en unos minutos.");
+        } catch (MPException e) {
+            log.error("No se pudo conectar con Mercado Pago: {}", e.getMessage());
             throw new BusinessException(HttpStatus.BAD_GATEWAY, "PAYMENT_PROVIDER_ERROR",
                     "No se pudo iniciar el pago. Intentá de nuevo en unos minutos.");
+        }
+    }
+
+    /** Mercado Pago solo acepta avisos a una URL https pública (no localhost). */
+    static boolean isPublicUrl(String url) {
+        if (url == null) return false;
+        try {
+            java.net.URI uri = java.net.URI.create(url.strip());
+            String host = uri.getHost();
+            return "https".equalsIgnoreCase(uri.getScheme()) && host != null && !host.equals("localhost")
+                    && !host.equals("127.0.0.1") && !host.endsWith(".localhost") && host.contains(".");
+        } catch (IllegalArgumentException e) {
+            return false;
         }
     }
 
