@@ -14,7 +14,7 @@ Este backend está desarrollado con **Java + Spring Boot** y expone una API REST
 - PostgreSQL
 - Maven
 - Mercado Pago SDK
-- SendGrid + Java Mail Sender
+- Brevo (correos transaccionales)
 - Web Push (VAPID)
 - OpenAPI 3 + Swagger UI (springdoc)
 
@@ -150,7 +150,7 @@ Configurations > Environment variables**, con **Nombre: JWT_SECRET** y
 | `APP_BACKEND_URL` | `http://localhost:8080` | URL pública de esta API |
 | `MERCADOPAGO_ACCESS_TOKEN` | *(vacío)* | Token de Mercado Pago |
 | `MERCADOPAGO_WEBHOOK_SECRET` | *(vacío)* | Secreto para validar la firma del webhook |
-| `SENDGRID_API_KEY` | *(vacío)* | Envío de correos |
+| `BREVO_API_KEY` | *(vacío)* | Envío de correos (Brevo) |
 | `MAIL_FROM` | `notificaciones@fluxyweb.com` | Remitente |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | *(vacío)* | Notificaciones push |
 | `VERCEL_TOKEN` / `VERCEL_PROJECT_ID` / `VERCEL_TEAM_ID` | *(vacío)* | Dominios personalizados |

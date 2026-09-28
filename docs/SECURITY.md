@@ -20,7 +20,7 @@ Los tokens emitidos antes de esta versión no tienen `sid`: cada persona inicia 
 ## 2. Registro verificado
 
 1. `POST /auth/signup` crea el usuario en `PENDING_VERIFICATION` y un borrador del negocio. **No crea la empresa.**
-2. Se envía un código de 6 dígitos al correo (SendGrid) y, si Twilio está configurado, por SMS al celular. La verificación por WhatsApp está **congelada** (el código sigue en `WhatsAppOtpService` y se reactiva con `PHONE_VERIFICATION_CHANNEL=whatsapp`).
+2. Se envía un código de 6 dígitos al correo (Brevo) y, si Twilio está configurado, por SMS al celular. La verificación por WhatsApp está **congelada** (el código sigue en `WhatsAppOtpService` y se reactiva con `PHONE_VERIFICATION_CHANNEL=whatsapp`).
 3. `POST /auth/signup/verify` con cada código. Al completar lo pendiente se crea la empresa y se abre la sesión.
 
 Códigos: HMAC con clave derivada, 10 minutos, 5 intentos, reenvío cada 60 s, 5 por destino y 10 por IP por hora, envío asíncrono después del commit, un código nuevo invalida los anteriores. Los registros sin completar se borran a los 7 días.
@@ -58,7 +58,7 @@ Todas las respuestas 429 llevan `Retry-After`. Los límites son por instancia (e
 
 - **Idempotencia:** `Idempotency-Key` en pedidos de la tienda, `POST /orders`, `POST /payments`, reembolsos y `create-preference`. Misma clave y contenido → misma respuesta (`Idempotent-Replayed: true`); otro contenido → `422`; en curso → `409`. Se guardan 24 h.
 - **Concurrencia:** stock y sesiones con bloqueo pesimista; `CHECK (stock >= 0)` en PostgreSQL.
-- **Proveedores externos:** tiempos límite en SendGrid, Twilio, WhatsApp, JWKS, Vercel, Mercado Pago y Gemini; circuit breaker en SendGrid, Twilio y WhatsApp.
+- **Proveedores externos:** tiempos límite en Brevo, Twilio, WhatsApp, JWKS, Vercel, Mercado Pago y Gemini; circuit breaker en Brevo, Twilio y WhatsApp.
 - **Errores:** forma única `{status, code, message, path, requestId}`; los 500 no exponen detalles.
 - **Cabeceras:** HSTS, `Referrer-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Permissions-Policy`.
 
@@ -89,7 +89,7 @@ El dueño puede programar la eliminación (`POST /company-account/deletion`, ide
 | Variable | Obligatoria | Uso |
 |---|---|---|
 | `JWT_SECRET` | Sí | Base64 de 32+ bytes. Rotarla invalida todas las sesiones y códigos vigentes. |
-| `SENDGRID_API_KEY`, `MAIL_FROM` | Sí | Códigos, recuperación y avisos. El remitente debe estar verificado en SendGrid. |
+| `BREVO_API_KEY`, `MAIL_FROM` | Sí | Códigos, recuperación y avisos. El remitente debe estar verificado en Brevo. |
 | `PHONE_VERIFICATION_CHANNEL` | No | `sms` (por defecto), `whatsapp` (congelado) o `none`. |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | No | Verificación del celular por SMS. Sin ellas el registro verifica solo el correo. |
 | `TWILIO_SMS_FROM` o `TWILIO_MESSAGING_SERVICE_SID` | Con Twilio | Remitente: número de Twilio (`+1…`) o Messaging Service (`MG…`, tiene prioridad). |

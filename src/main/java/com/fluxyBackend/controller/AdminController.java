@@ -58,10 +58,10 @@ public class AdminController {
         String email      = auth.getName();
         String adminEmail = System.getenv("ADMIN_EMAIL");
 
-        // ✅ Aceptar si el email coincide con el admin configurado en env
+        // Aceptar si el email coincide con el admin configurado en env
         if (adminEmail != null && email.equalsIgnoreCase(adminEmail.trim())) return;
 
-        // ✅ Aceptar si tiene rol ADMIN en la BD (fallback)
+        // Aceptar si tiene rol ADMIN en la BD (fallback)
         boolean isAdminInDb = userRepository.findByEmailIgnoreCase(email)
                 .map(u -> u.getRole() == Role.ADMIN)
                 .orElse(false);
@@ -111,7 +111,7 @@ public class AdminController {
         ));
     }
 
-    // ─── Vendedores por día (últimos 30 días) para gráfica ───────────────────
+    // Vendedores por día (últimos 30 días) para gráfica
     @Operation(summary = "Consultar altas diarias de vendedores",
             description = "Devuelve date (dd/MM) y count de los últimos 30 días.")
     @GetMapping("/metrics/vendors-per-day")
@@ -150,7 +150,7 @@ public class AdminController {
         return ResponseEntity.ok(result);
     }
 
-    // ─── Ingresos por mes (últimos 6 meses) ──────────────────────────────────
+    // Ingresos por mes (últimos 6 meses)
     @Operation(summary = "Consultar ingresos estimados por mes",
             description = "Devuelve month y revenue de los últimos seis meses, estimados según el plan actual y su fecha de activación.")
     @GetMapping("/metrics/revenue-per-month")
@@ -189,7 +189,7 @@ public class AdminController {
         return ResponseEntity.ok(result);
     }
 
-    // ─── Lista de vendedores ──────────────────────────────────────────────────
+    // Lista de vendedores
     @Operation(summary = "Listar vendedores",
             description = "Devuelve las empresas con datos de su propietario y plan, ordenadas desde la más reciente.")
     @GetMapping("/vendors")
@@ -325,7 +325,7 @@ public class AdminController {
         return ResponseEntity.ok(Map.of("message", "Vendedor eliminado correctamente."));
     }
 
-    // ─── Cerrar sesiones de un negocio ────────────────────────────────────────
+    // Cerrar sesiones de un negocio
     @Operation(summary = "Cerrar todas las sesiones de un negocio",
             description = "Respuesta a incidentes: revoca los refresh tokens de todas las personas del negocio.")
     @PostMapping("/vendors/{companyId}/revoke-sessions")

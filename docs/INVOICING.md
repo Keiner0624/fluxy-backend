@@ -79,7 +79,7 @@ copian al comprobante.
 
 - Automática (opcional): cuando el pedido queda pagado por completo o cuando se entrega. Usa el comprobante que pidió el
   cliente en el checkout (boleta o factura, con sus datos ya validados) o, si no pidió, boleta a su nombre.
-- Correo (SendGrid) con el PDF y opcionalmente el XML adjuntos y el enlace seguro. Estado propio
+- Correo (Brevo) con el PDF y opcionalmente el XML adjuntos y el enlace seguro. Estado propio
   (`PENDING → SENT / FAILED`, 3 reintentos). `DELIVERED` y `BOUNCED` quedan para cuando se reciban los eventos del
   proveedor de correo. Reenviar nunca vuelve a emitir.
 - Ticket de 80 o 58 mm desde el navegador, con el QR de SUNAT (`RUC|tipo|serie|número|IGV|total|fecha|tipo doc|doc|hash|`).

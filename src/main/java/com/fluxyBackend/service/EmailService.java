@@ -1,119 +1,151 @@
 package com.fluxyBackend.service;
 
-import com.sendgrid.Method;
-import com.sendgrid.Request;
-import com.sendgrid.SendGrid;
-import com.sendgrid.helpers.mail.Mail;
-import com.sendgrid.helpers.mail.objects.Content;
-import com.sendgrid.helpers.mail.objects.Email;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
+/**
+ * Correos de Fluxy por la API transaccional de Brevo (POST /v3/smtp/email).
+ * Variables: BREVO_API_KEY y MAIL_FROM (un remitente o dominio verificado en Brevo).
+ */
 @Service
 public class EmailService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
-    @Value("${sendgrid.api.key:}")
-    private String sendgridKey;
+    @Value("${brevo.api_key:}")
+    private String brevoKey;
+
+    @Value("${brevo.base_url:https://api.brevo.com}")
+    private String brevoUrl;
 
     @Value("${mail.from}")
     private String mailFrom;
 
-    /** Tras 5 fallos seguidos no se llama a SendGrid por un minuto. */
-    private final CircuitBreaker breaker = new CircuitBreaker("sendgrid", 5, java.time.Duration.ofMinutes(1));
-    private volatile SendGrid client;
+    @Value("${mail.from_name:Fluxy}")
+    private String mailFromName;
+
+    /** Tras 5 fallos seguidos no se llama a Brevo por un minuto. */
+    private final CircuitBreaker breaker = new CircuitBreaker("brevo", 5, Duration.ofMinutes(1));
+    /** Tiempos límite explícitos: un proveedor lento no deja colgado el hilo que envía. */
+    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
     public boolean isConfigured() {
-        return sendgridKey != null && !sendgridKey.isBlank();
+        return brevoKey != null && !brevoKey.isBlank();
     }
 
-    /**
-     * Cliente con tiempos límite explícitos: sin ellos, un SendGrid lento dejaba
-     * colgado el hilo que enviaba el correo.
-     */
-    private SendGrid client() {
-        if (client == null) {
-            synchronized (this) {
-                if (client == null) {
-                    org.apache.http.client.config.RequestConfig config = org.apache.http.client.config.RequestConfig.custom()
-                            .setConnectTimeout(5_000)
-                            .setConnectionRequestTimeout(5_000)
-                            .setSocketTimeout(10_000)
-                            .build();
-                    org.apache.http.impl.client.CloseableHttpClient http = org.apache.http.impl.client.HttpClients.custom()
-                            .setDefaultRequestConfig(config)
-                            .build();
-                    client = new SendGrid(sendgridKey, new com.sendgrid.Client(http));
-                }
-            }
+    /** Aviso al arrancar: sin Brevo no salen códigos de verificación ni avisos de pedidos. */
+    @jakarta.annotation.PostConstruct
+    void warnIfNotConfigured() {
+        if (!isConfigured()) {
+            log.error("BREVO_API_KEY no está configurado: no se envían correos (verificación, pedidos, planes)");
+        } else {
+            log.info("Correos por Brevo desde {} (debe ser un remitente o dominio verificado en Brevo)", mailFrom);
         }
-        return client;
     }
 
     // ─── Método base para enviar emails ──────────────────────────────────────
     /** Archivo adjunto (comprobantes electrónicos). */
     public record Attachment(String fileName, String contentType, byte[] content) {}
 
-    /** Correo con adjuntos. @return true si SendGrid lo aceptó. */
+    /** Correo con adjuntos. @return true si Brevo lo aceptó. */
     public boolean sendWithAttachments(String toEmail, String toName, String subject, String html,
-                                       java.util.List<Attachment> attachments) {
+                                       List<Attachment> attachments) {
         return send(toEmail, toName, subject, html, attachments);
     }
 
-    /** @return true si SendGrid aceptó el correo. */
+    /** @return true si Brevo aceptó el correo. */
     private boolean send(String toEmail, String toName, String subject, String html) {
-        return send(toEmail, toName, subject, html, java.util.List.of());
+        return send(toEmail, toName, subject, html, List.of());
     }
 
-    private boolean send(String toEmail, String toName, String subject, String html, java.util.List<Attachment> attachments) {
+    private boolean send(String toEmail, String toName, String subject, String html, List<Attachment> attachments) {
         if (!isConfigured()) {
-            log.warn("SendGrid no configurado. No se envió el correo \"{}\"", subject);
+            log.warn("Brevo no configurado. No se envió el correo \"{}\"", subject);
+            return false;
+        }
+        if (toEmail == null || toEmail.isBlank()) {
+            log.warn("Correo \"{}\" sin destinatario: no se envió", subject);
             return false;
         }
         if (!breaker.allowRequest()) {
-            log.warn("SendGrid en pausa por fallos recientes. No se envió el correo \"{}\"", subject);
+            log.warn("Brevo en pausa por fallos recientes. No se envió el correo \"{}\"", subject);
             return false;
         }
         try {
-            Email from    = new Email(mailFrom, "Fluxy");
-            Email to      = new Email(toEmail, toName);
-            Content content = new Content("text/html", html);
-            Mail mail = new Mail(from, subject, to, content);
-            for (Attachment attachment : attachments) {
-                com.sendgrid.helpers.mail.objects.Attachments file = new com.sendgrid.helpers.mail.objects.Attachments();
-                file.setContent(java.util.Base64.getEncoder().encodeToString(attachment.content()));
-                file.setType(attachment.contentType());
-                file.setFilename(attachment.fileName());
-                file.setDisposition("attachment");
-                mail.addAttachments(file);
+            Map<String, Object> recipient = new LinkedHashMap<>();
+            recipient.put("email", toEmail.strip());
+            if (toName != null && !toName.isBlank()) recipient.put("name", toName.strip());
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("sender", Map.of("name", mailFromName, "email", mailFrom));
+            body.put("to", List.of(recipient));
+            body.put("subject", subject);
+            body.put("htmlContent", html);
+            if (!attachments.isEmpty()) {
+                List<Map<String, String>> files = new ArrayList<>();
+                for (Attachment a : attachments) {
+                    files.add(Map.of("name", a.fileName(), "content", Base64.getEncoder().encodeToString(a.content())));
+                }
+                body.put("attachment", files);
             }
 
-            Request req = new Request();
-            req.setMethod(Method.POST);
-            req.setEndpoint("mail/send");
-            req.setBody(mail.build());
-            com.sendgrid.Response response = client().api(req);
-
-            if (response.getStatusCode() >= 200 && response.getStatusCode() < 300) {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(brevoUrl.replaceAll("/+$", "") + "/v3/smtp/email"))
+                    .timeout(Duration.ofSeconds(20))
+                    .header("api-key", brevoKey.strip())
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body)))
+                    .build();
+            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            int status = response.statusCode();
+            if (status >= 200 && status < 300) {
                 breaker.recordSuccess();
-                log.info("Correo enviado — Asunto: {}", subject);
+                log.info("Correo enviado — Asunto: {} ({})", subject, messageId(response.body()));
                 return true;
             }
-            // 4xx es un problema de configuración (remitente no verificado, clave inválida), no del proveedor.
-            if (response.getStatusCode() >= 500) breaker.recordFailure();
-            log.error("SendGrid rechazó el correo \"{}\": HTTP {}", subject, response.getStatusCode());
+            // 4xx es configuración (clave inválida, remitente sin verificar): no es una falla del proveedor.
+            if (status >= 500) breaker.recordFailure();
+            log.error("Brevo rechazó el correo \"{}\": HTTP {} {}", subject, status, truncate(response.body()));
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             return false;
         } catch (Exception e) {
             breaker.recordFailure();
             log.error("Error al enviar el correo \"{}\": {}", subject, e.getMessage());
             return false;
         }
+    }
+
+    private static String messageId(String body) {
+        try {
+            JsonNode node = JSON.readTree(body == null || body.isBlank() ? "{}" : body);
+            return node.path("messageId").asString("sin id");
+        } catch (Exception e) {
+            return "sin id";
+        }
+    }
+
+    private static String truncate(String value) {
+        if (value == null) return "";
+        return value.length() > 400 ? value.substring(0, 400) + "…" : value;
     }
 
     // ─── Seguridad de la cuenta ──────────────────────────────────────────────
@@ -589,8 +621,8 @@ public class EmailService {
     /** Devuelve false si el correo no está configurado: el panel ofrece copiar el enlace. */
     public boolean sendTeamInvitationEmail(String toEmail, String companyName, String inviterName,
                                            String roleLabel, String acceptUrl) {
-        if (sendgridKey == null || sendgridKey.isBlank()) {
-            log.warn("SendGrid no configurado. La invitación a {} se comparte con el enlace.", toEmail);
+        if (!isConfigured()) {
+            log.warn("Brevo no configurado. La invitación a {} se comparte con el enlace.", toEmail);
             return false;
         }
         String html = """
