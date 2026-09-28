@@ -50,6 +50,8 @@ class AiIntegrationTest {
     private static final List<String> KEYS = new CopyOnWriteArrayList<>();
     private static final List<String> BODIES = new CopyOnWriteArrayList<>();
     private static final AtomicReference<Object[]> REPLY = new AtomicReference<>();
+    /** Respuestas que salen antes que REPLY, en orden (para simular una falla y el reintento). */
+    private static final java.util.Queue<Object[]> NEXT = new java.util.concurrent.ConcurrentLinkedQueue<>();
 
     static {
         try {
@@ -58,7 +60,8 @@ class AiIntegrationTest {
                 PATHS.add(exchange.getRequestURI().toString());
                 KEYS.add(exchange.getRequestHeaders().getFirst("x-goog-api-key"));
                 BODIES.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-                Object[] reply = REPLY.get();
+                Object[] next = NEXT.poll();
+                Object[] reply = next != null ? next : REPLY.get();
                 byte[] bytes = ((String) reply[1]).getBytes(StandardCharsets.UTF_8);
                 exchange.sendResponseHeaders((Integer) reply[0], bytes.length);
                 try (OutputStream out = exchange.getResponseBody()) {
@@ -94,6 +97,7 @@ class AiIntegrationTest {
     void setUp() {
         rateLimits.reset();
         PATHS.clear();
+        NEXT.clear();
         KEYS.clear();
         BODIES.clear();
         REPLY.set(new Object[]{200, text("\"Mochila resistente para el día a día, con espacio para tu laptop y todo lo que llevás.\"")});
@@ -113,6 +117,21 @@ class AiIntegrationTest {
         assertThat(sent.at("/contents/0/parts/0/text").asString()).contains("\"Mochila urbana\"").contains("\"89.90\"");
         assertThat(sent.at("/systemInstruction/parts/0/text").asString()).contains("no inventes");
         assertThat(sent.at("/generationConfig/thinkingConfig/thinkingBudget").asInt()).isZero();
+    }
+
+    @Test
+    void siElModeloFueRetiradoReintentaConElAliasVigente() throws Exception {
+        NEXT.add(new Object[]{404, "{\"error\":{\"code\":404,\"status\":\"NOT_FOUND\"}}"});
+        mvc.perform(post("/ai/describe").header("Authorization", owner(Plan.BUSINESS)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Mochila urbana\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value(org.hamcrest.Matchers.startsWith("Mochila resistente")));
+        assertThat(PATHS).containsExactly("/v1beta/models/gemini-2.5-flash:generateContent",
+                "/v1beta/models/gemini-flash-latest:generateContent");
+        // En el alias no se apaga el razonamiento: se deja lugar para pensar y responder.
+        JsonNode retry = json.readTree(BODIES.get(1));
+        assertThat(retry.at("/generationConfig/thinkingConfig").isMissingNode()).isTrue();
+        assertThat(retry.at("/generationConfig/maxOutputTokens").asInt()).isGreaterThan(300);
     }
 
     @Test

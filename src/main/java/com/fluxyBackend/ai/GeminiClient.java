@@ -27,10 +27,15 @@ import java.util.Map;
  *
  * La clave va en la cabecera x-goog-api-key, nunca en la URL (las URLs quedan en logs de proxies).
  * El modelo se configura con GEMINI_MODEL: Google retira modelos viejos y así se cambia sin tocar código.
+ * Si el modelo configurado ya no existe (404), se reintenta con el alias gemini-flash-latest, que
+ * Google mantiene apuntando al Flash vigente: un modelo retirado no deja a las tiendas sin IA.
  */
 @Slf4j
 @Component
 public class GeminiClient {
+
+    /** Alias de Google al modelo Flash vigente. */
+    static final String FALLBACK_MODEL = "gemini-flash-latest";
 
     private final JsonMapper json;
     private final String apiKey;
@@ -45,7 +50,8 @@ public class GeminiClient {
                         @Value("${gemini.model:gemini-2.5-flash}") String model,
                         @Value("${gemini.base_url:https://generativelanguage.googleapis.com}") String baseUrl) {
         this.json = json;
-        this.apiKey = apiKey;
+        // Una clave pegada con espacios, saltos de línea o comillas la rechaza Google con un 400 confuso.
+        this.apiKey = apiKey == null ? null : apiKey.strip().replaceAll("^[\"']+|[\"']+$", "");
         this.model = model == null || model.isBlank() ? "gemini-2.5-flash" : model.strip();
         this.baseUrl = baseUrl.replaceAll("/+$", "");
     }
@@ -67,12 +73,26 @@ public class GeminiClient {
             throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, "AI_UNAVAILABLE",
                     "La IA está con problemas. Probá de nuevo en un minuto.");
         }
+        HttpResponse<String> response = call(model, instructions, prompt, maxTokens, temperature, jsonOutput);
+        String used = model;
+        if (response.statusCode() == 404 && !FALLBACK_MODEL.equals(model)) {
+            log.warn("Gemini no encontró el modelo {}: se usa {}. Actualizá GEMINI_MODEL.", model, FALLBACK_MODEL);
+            response = call(FALLBACK_MODEL, instructions, prompt, maxTokens, temperature, jsonOutput);
+            used = FALLBACK_MODEL;
+        }
+        return read(response, used);
+    }
+
+    private HttpResponse<String> call(String model, String instructions, String prompt, int maxTokens, double temperature,
+                                      boolean jsonOutput) {
         Map<String, Object> config = new LinkedHashMap<>();
-        config.put("maxOutputTokens", maxTokens);
+        // Los modelos 2.5 "piensan" antes de responder y eso consume tokens y tiempo: para textos cortos no hace falta.
+        // En otros modelos no se puede apagar igual: se deja lugar para que piensen y además respondan.
+        boolean noThinking = model.startsWith("gemini-2.5");
+        config.put("maxOutputTokens", noThinking ? maxTokens : maxTokens * 8);
         config.put("temperature", temperature);
         if (jsonOutput) config.put("responseMimeType", "application/json");
-        // Los modelos 2.5 "piensan" antes de responder y eso consume tokens y tiempo: para textos cortos no hace falta.
-        if (model.startsWith("gemini-2.5")) config.put("thinkingConfig", Map.of("thinkingBudget", 0));
+        if (noThinking) config.put("thinkingConfig", Map.of("thinkingBudget", 0));
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("systemInstruction", Map.of("parts", List.of(Map.of("text", instructions))));
         body.put("contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", prompt)))));
@@ -85,9 +105,8 @@ public class GeminiClient {
                 .header("x-goog-api-key", apiKey)
                 .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)))
                 .build();
-        HttpResponse<String> response;
         try {
-            response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            return http.send(request, HttpResponse.BodyHandlers.ofString());
         } catch (HttpTimeoutException e) {
             breaker.recordFailure();
             throw failed("La IA tardó demasiado en responder. Probá de nuevo.");
@@ -99,7 +118,9 @@ public class GeminiClient {
             Thread.currentThread().interrupt();
             throw failed("La generación se interrumpió.");
         }
+    }
 
+    private String read(HttpResponse<String> response, String model) {
         int status = response.statusCode();
         if (status == 429) {
             throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, "AI_UNAVAILABLE",
