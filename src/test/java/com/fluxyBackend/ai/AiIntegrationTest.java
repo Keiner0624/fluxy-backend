@@ -77,6 +77,7 @@ class AiIntegrationTest {
     @DynamicPropertySource
     static void gemini(DynamicPropertyRegistry registry) {
         registry.add("gemini.api.key", () -> "clave-secreta-de-prueba");
+        registry.add("gemini.model", () -> "gemini-2.5-flash");
         registry.add("gemini.base_url", () -> "http://127.0.0.1:" + GEMINI.getAddress().getPort());
     }
 

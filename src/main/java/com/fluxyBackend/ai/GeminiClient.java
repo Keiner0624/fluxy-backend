@@ -26,7 +26,8 @@ import java.util.Map;
  * Cliente de Google Gemini (API generateContent).
  *
  * La clave va en la cabecera x-goog-api-key, nunca en la URL (las URLs quedan en logs de proxies).
- * El modelo se configura con GEMINI_MODEL: Google retira modelos viejos y así se cambia sin tocar código.
+ * El modelo se configura con GEMINI_MODEL; por defecto gemini-flash-latest, el alias que Google mantiene
+ * en el Flash vigente (gemini-2.5-flash ya no se ofrece a cuentas nuevas).
  * Si el modelo configurado ya no existe (404), se reintenta con el alias gemini-flash-latest, que
  * Google mantiene apuntando al Flash vigente: un modelo retirado no deja a las tiendas sin IA.
  */
@@ -47,12 +48,12 @@ public class GeminiClient {
 
     public GeminiClient(JsonMapper json,
                         @Value("${gemini.api.key:}") String apiKey,
-                        @Value("${gemini.model:gemini-2.5-flash}") String model,
+                        @Value("${gemini.model:gemini-flash-latest}") String model,
                         @Value("${gemini.base_url:https://generativelanguage.googleapis.com}") String baseUrl) {
         this.json = json;
         // Una clave pegada con espacios, saltos de línea o comillas la rechaza Google con un 400 confuso.
         this.apiKey = apiKey == null ? null : apiKey.strip().replaceAll("^[\"']+|[\"']+$", "");
-        this.model = model == null || model.isBlank() ? "gemini-2.5-flash" : model.strip();
+        this.model = model == null || model.isBlank() ? FALLBACK_MODEL : model.strip();
         this.baseUrl = baseUrl.replaceAll("/+$", "");
     }
 
